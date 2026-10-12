@@ -11,6 +11,8 @@
 
 import 'dart:convert';
 
+import 'l10n.dart';
+
 /// Cât timp contează o neprezentare.
 const kNoShowWindow = Duration(days: 180);
 
@@ -41,12 +43,12 @@ const kNoShowSmsSentKey = 'no_show_sms_sent';
 String noShowSmsText(DateTime at, int threshold, int count) {
   String two(int n) => n.toString().padLeft(2, '0');
   final when = '${two(at.day)}.${two(at.month)}.${at.year}';
-  final base = 'Nu te-ai prezentat la rezervarea din $when.';
+  final base = tr('Nu te-ai prezentat la rezervarea din $when.', 'You did not show up for your booking on $when.');
   if (threshold <= 0) return base;
   if (count >= threshold) {
-    return '$base Nu mai poți face rezervări prin SMS; te rugăm să suni la pensiune.';
+    return tr('$base Nu mai poți face rezervări prin SMS; te rugăm să suni la pensiune.', '$base You can no longer book by SMS; please call the guesthouse.');
   }
-  return '$base La $threshold neprezentări nu mai poți rezerva prin SMS.';
+  return tr('$base La $threshold neprezentări nu mai poți rezerva prin SMS.', '$base At $threshold no-shows you can no longer book by SMS.');
 }
 
 /// Ultimele 9 cifre ale telefonului; '' dacă are prea puține ca să fie sigur.

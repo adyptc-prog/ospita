@@ -16,6 +16,9 @@ import java.util.concurrent.Executors
 /**
  * Bot de rezervări prin SMS pentru clienți.
  *
+ * Cuvintele-cheie sunt acceptate mereu în ambele limbi (liber/free,
+ * anuleaza/cancel); răspunsul pleacă în limba aleasă în aplicație (AppLang).
+ *
  *   „liber” / „liber <tabel>”  → întreabă câte nopți, apoi oferă până la 6
  *                                 perioade disponibile, numerotate
  *   „next”                     → următoarea pagină de date libere
@@ -70,16 +73,16 @@ class ClientBookingReceiver : BroadcastReceiver() {
         private val DISPLAY_TIME_FMT: DateTimeFormatter  = DateTimeFormatter.ofPattern("HH:mm")
         private val DISPLAY_DATE_FMT: DateTimeFormatter  = DateTimeFormatter.ofPattern("dd.MM")
 
-        private val LIBER_RE   = Regex("^liber(\\s+(\\S+))?$")
+        private val LIBER_RE   = Regex("^(?:liber|free)(\\s+(\\S+))?$")
         private val NUMBER_RE  = Regex("^(\\d{1,2})$")
         // "anuleaza" / "anulare", eventual urmat de orice alt text (ex. "anuleaza
         // aceasta programare") — normalize() scoate deja diacriticele, deci
         // "anulează" ajunge tot aici.
-        private val CANCEL_RE  = Regex("^(anuleaza|anulare)(\\s+.*)?$")
+        private val CANCEL_RE  = Regex("^(anuleaza|anulare|cancel)(\\s+.*)?$")
         // Cât timp clientul are o listă activă, acceptăm și forme ca „3.”,
         // „3)”, „nr 3”, „opțiunea 3”, „2 nopți” (diacriticele sunt deja scoase).
         private val LOOSE_NUMBER_RE =
-            Regex("^(?:(?:optiunea|optiune|varianta|numarul|numar|nr|ora)\\.?\\s*)?(\\d{1,2})\\s*(?:nopti|noapte|nopte|zile|zi)?\\s*[.)!]*$")
+            Regex("^(?:(?:optiunea|optiune|varianta|numarul|numar|nr|ora|option|number|no)\\.?\\s*)?(\\d{1,2})\\s*(?:nopti|noapte|nopte|zile|zi|nights|night|days|day)?\\s*[.)!]*$")
         // Un text scurt, nerecunoscut, primit în timpul unei liste active
         // primește o singură dată un mesaj de ajutor; unul lung e probabil
         // un SMS personal și rămâne fără răspuns.
@@ -128,6 +131,8 @@ class ClientBookingReceiver : BroadcastReceiver() {
     // internal: apelat direct de testele Robolectric (fără SMS-uri reale).
     internal fun handleMessage(context: Context, sender: String, rawBody: String) {
         Diag.i("handleMessage sender=${Diag.mask(sender)} len=${rawBody.length}")
+        // Răspunsurile pleacă în limba aleasă în aplicație pe acest telefon.
+        AppLang.sync(context)
         // Mesaje de sincronizare — ale acestei aplicații (PEN:) sau ale
         // aplicației Organizator (ORG:), dacă e pe același telefon.
         if (rawBody.startsWith("PEN:") || rawBody.startsWith("ORG:")) {
@@ -209,23 +214,34 @@ class ClientBookingReceiver : BroadcastReceiver() {
                 markHelped(context, NIGHTS_OFFERS_KEY, senderDigits)
                 sendSms(
                     context, sender,
-                    "Nu am înțeles. Răspunde doar cu numărul de nopți (ex. 2)."
+                    tr(
+                        "Nu am înțeles. Răspunde doar cu numărul de nopți (ex. 2).",
+                        "I didn't understand. Reply with just the number of nights (e.g. 2).",
+                    )
                 )
             }
             helpFor == "booking" -> {
                 markHelped(context, OFFERS_KEY, senderDigits)
                 sendSms(
                     context, sender,
-                    "Nu am înțeles. Răspunde doar cu numărul variantei dorite (ex. 2), " +
-                        "NEXT pentru alte date sau LIBER pentru o căutare nouă."
+                    tr(
+                        "Nu am înțeles. Răspunde doar cu numărul variantei dorite (ex. 2), " +
+                            "NEXT pentru alte date sau LIBER pentru o căutare nouă.",
+                        "I didn't understand. Reply with just the number of the option you want (e.g. 2), " +
+                            "NEXT for other dates or FREE for a new search.",
+                    )
                 )
             }
             helpFor == "cancel" -> {
                 markHelped(context, CANCEL_OFFERS_KEY, senderDigits)
                 sendSms(
                     context, sender,
-                    "Nu am înțeles. Răspunde doar cu numărul rezervării pe care vrei " +
-                        "să o anulezi (ex. 1)."
+                    tr(
+                        "Nu am înțeles. Răspunde doar cu numărul rezervării pe care vrei " +
+                            "să o anulezi (ex. 1).",
+                        "I didn't understand. Reply with just the number of the booking you want " +
+                            "to cancel (e.g. 1).",
+                    )
                 )
             }
             liberMatch != null -> {
@@ -282,7 +298,10 @@ class ClientBookingReceiver : BroadcastReceiver() {
             .atZone(java.time.ZoneId.systemDefault()).toLocalTime()
         sendSms(
             context, sender,
-            "Ai trimis multe mesaje într-un timp scurt. Poți reveni după ora ${until.format(TIME_FMT)}."
+            tr(
+                "Ai trimis multe mesaje într-un timp scurt. Poți reveni după ora ${until.format(TIME_FMT)}.",
+                "You sent many messages in a short time. You can try again after ${until.format(TIME_FMT)}.",
+            )
         )
     }
 
@@ -319,8 +338,12 @@ class ClientBookingReceiver : BroadcastReceiver() {
         if (BotLimits.canBookMore(findActiveBookings(context, senderDigits).size)) return false
         sendSms(
             context, sender,
-            "Ai deja ${BotLimits.MAX_ACTIVE_BOOKINGS_PER_NUMBER} rezervări active. " +
-                "Pentru una nouă, anulează mai întâi una scriind ANULEAZA."
+            tr(
+                "Ai deja ${BotLimits.MAX_ACTIVE_BOOKINGS_PER_NUMBER} rezervări active. " +
+                    "Pentru una nouă, anulează mai întâi una scriind ANULEAZA.",
+                "You already have ${BotLimits.MAX_ACTIVE_BOOKINGS_PER_NUMBER} active bookings. " +
+                    "For a new one, first cancel one by texting CANCEL.",
+            )
         )
         return true
     }
@@ -475,28 +498,43 @@ class ClientBookingReceiver : BroadcastReceiver() {
         val board = matchBoard(boards, token)
         if (board == null) {
             // Nu trimitem lista tabelelor — numele interne nu sunt pentru oricine.
-            sendSms(context, sender, "Nu am găsit tabelul \"$token\". Verifică numele și scrie din nou LIBER.")
+            sendSms(
+                context, sender,
+                tr(
+                    "Nu am găsit tabelul \"$token\". Verifică numele și scrie din nou LIBER.",
+                    "I couldn't find \"$token\". Check the name and text FREE again.",
+                ),
+            )
             return
         }
 
         val settings = BookingSettings.loadSettings(context, board.id)
         Diag.i("startOffer: board=${board.id} settings.enabled=${settings.enabled}")
         if (!settings.enabled) {
-            sendSms(context, sender, "Rezervările prin SMS nu sunt active pentru ${board.name}.")
+            sendSms(
+                context, sender,
+                tr(
+                    "Rezervările prin SMS nu sunt active pentru ${board.name}.",
+                    "SMS bookings are not active for ${board.name}.",
+                ),
+            )
             return
         }
 
         if (bookingLimitReached(context, sender, senderDigits)) return
 
         setNightsOffer(context, senderDigits, board.id)
-        sendSms(context, sender, "Câte nopți? Răspunde cu un număr (1-30).")
+        sendSms(
+            context, sender,
+            tr("Câte nopți? Răspunde cu un număr (1-30).", "How many nights? Reply with a number (1-30)."),
+        )
     }
 
     // ── Confirmare număr de nopți → prima pagină de sejururi disponibile ────────
     private fun confirmNights(context: Context, sender: String, senderDigits: String, nights: Int) {
         val offer = getNightsOffer(context, senderDigits)
         if (offer == null) {
-            sendSms(context, sender, "Nu am nicio căutare activă. Scrie LIBER pentru a rezerva un sejur.")
+            sendSms(context, sender, noActiveSearch())
             return
         }
         val boardId = offer.optString("board", "")
@@ -504,7 +542,13 @@ class ClientBookingReceiver : BroadcastReceiver() {
         clearNightsOffer(context, senderDigits)
         if (board == null) return
         if (nights < 1 || nights > 30) {
-            sendSms(context, sender, "Număr de nopți invalid. Scrie LIBER și apoi un număr între 1 și 30.")
+            sendSms(
+                context, sender,
+                tr(
+                    "Număr de nopți invalid. Scrie LIBER și apoi un număr între 1 și 30.",
+                    "Invalid number of nights. Text FREE and then a number between 1 and 30.",
+                ),
+            )
             return
         }
         val settings = BookingSettings.loadSettings(context, board.id)
@@ -515,7 +559,7 @@ class ClientBookingReceiver : BroadcastReceiver() {
     private fun continueOffer(context: Context, sender: String, senderDigits: String) {
         val offer = getOffer(context, senderDigits)
         if (offer == null) {
-            sendSms(context, sender, "Nu am nicio căutare activă. Scrie LIBER pentru a rezerva un sejur.")
+            sendSms(context, sender, noActiveSearch())
             return
         }
         val boardId = offer.optString("board", "")
@@ -534,6 +578,14 @@ class ClientBookingReceiver : BroadcastReceiver() {
             offer.optInt("nights", 1), offset = nextOffset, isFirstPage = false)
     }
 
+    private fun noActiveSearch(): String = tr(
+        "Nu am nicio căutare activă. Scrie LIBER pentru a rezerva un sejur.",
+        "I have no active search. Text FREE to book a stay.",
+    )
+
+    private fun nightsWord(nights: Int): String =
+        if (nights == 1) tr("noapte", "night") else tr("nopți", "nights")
+
     private class Page(val slots: List<FreeSlot>, val hasMore: Boolean)
 
     // ── Pagină de sejururi disponibile ──────────────────────────
@@ -548,13 +600,19 @@ class ClientBookingReceiver : BroadcastReceiver() {
         isFirstPage: Boolean,
     ) {
         val page = computeZilePage(context, board, settings, nights, offset)
-        val nightsWord = if (nights == 1) "noapte" else "nopți"
+        val nightsWord = nightsWord(nights)
 
         if (page.slots.isEmpty()) {
             val msg = if (isFirstPage) {
-                "Nu sunt date disponibile pentru $nights $nightsWord la ${board.name} în perioada verificată."
+                tr(
+                    "Nu sunt date disponibile pentru $nights $nightsWord la ${board.name} în perioada verificată.",
+                    "No dates are available for $nights $nightsWord at ${board.name} in the period checked.",
+                )
             } else {
-                "Nu mai sunt alte date disponibile pentru $nights $nightsWord la ${board.name}. Scrie LIBER pentru o căutare nouă."
+                tr(
+                    "Nu mai sunt alte date disponibile pentru $nights $nightsWord la ${board.name}. Scrie LIBER pentru o căutare nouă.",
+                    "There are no more dates available for $nights $nightsWord at ${board.name}. Text FREE for a new search.",
+                )
             }
             sendSms(context, sender, msg)
             clearOffer(context, senderDigits)
@@ -566,8 +624,13 @@ class ClientBookingReceiver : BroadcastReceiver() {
         val lines = page.slots.mapIndexed { i, slot ->
             "${i + 1}. ${slot.start.format(DISPLAY_DATE_FMT)} → ${slot.end.format(DISPLAY_DATE_FMT)}"
         }
-        val footer = "Răspunde cu numărul opțiunii pentru rezervare" + (if (page.hasMore) ", sau NEXT pentru alte date." else ".")
-        sendSms(context, sender, "Disponibil $nights $nightsWord la ${board.name}:\n${lines.joinToString("\n")}\n$footer")
+        val footer = tr("Răspunde cu numărul opțiunii pentru rezervare", "Reply with the option number to book") +
+            (if (page.hasMore) tr(", sau NEXT pentru alte date.", ", or NEXT for other dates.") else ".")
+        val header = tr(
+            "Disponibil $nights $nightsWord la ${board.name}:",
+            "Available, $nights $nightsWord at ${board.name}:",
+        )
+        sendSms(context, sender, "$header\n${lines.joinToString("\n")}\n$footer")
     }
 
     // Cerem o perioadă „în plus” față de pagina curentă (peekTarget), doar ca
@@ -590,7 +653,13 @@ class ClientBookingReceiver : BroadcastReceiver() {
     private fun confirmOffer(context: Context, sender: String, senderDigits: String, choice: Int) {
         val offer = getOffer(context, senderDigits)
         if (offer == null) {
-            sendSms(context, sender, "Nu am nicio ofertă activă pentru tine. Scrie LIBER pentru a rezerva un sejur.")
+            sendSms(
+                context, sender,
+                tr(
+                    "Nu am nicio ofertă activă pentru tine. Scrie LIBER pentru a rezerva un sejur.",
+                    "I have no active offer for you. Text FREE to book a stay.",
+                ),
+            )
             return
         }
         val boardId = offer.optString("board", "")
@@ -613,8 +682,12 @@ class ClientBookingReceiver : BroadcastReceiver() {
         if (choice < 1 || choice > page.slots.size) {
             sendSms(
                 context, sender,
-                "Opțiune invalidă sau expirată. Răspunde cu un număr din ultimul mesaj primit, " +
-                    "sau scrie LIBER pentru o căutare nouă."
+                tr(
+                    "Opțiune invalidă sau expirată. Răspunde cu un număr din ultimul mesaj primit, " +
+                        "sau scrie LIBER pentru o căutare nouă.",
+                    "Invalid or expired option. Reply with a number from the last message you received, " +
+                        "or text FREE for a new search.",
+                )
             )
             return
         }
@@ -643,15 +716,21 @@ class ClientBookingReceiver : BroadcastReceiver() {
                 .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
         )
 
-        val nightsWord = if (nights == 1) "noapte" else "nopți"
-        val ibanLine = if (settings.iban.isNotBlank()) " în contul ${settings.iban}" else ""
+        val nightsWord = nightsWord(nights)
+        val ibanLine = if (settings.iban.isNotBlank()) {
+            tr(" în contul ${settings.iban}", " to the account ${settings.iban}")
+        } else ""
+        val period = "${slot.start.format(DISPLAY_DATE_FMT)} → ${slot.end.format(DISPLAY_DATE_FMT)}"
         sendSms(
             context, sender,
-            "Rezervarea ta la ${board.name}, ${slot.start.format(DISPLAY_DATE_FMT)} → " +
-                "${slot.end.format(DISPLAY_DATE_FMT)} ($nights $nightsWord), a fost salvată. " +
-                "Achită în maxim 24 de ore$ibanLine, altfel rezervarea va fi anulată automat. " +
-                "Te anunțăm prin SMS după confirmarea plății." +
-                noShowWarning(context, sender)
+            tr(
+                "Rezervarea ta la ${board.name}, $period ($nights $nightsWord), a fost salvată. " +
+                    "Achită în maxim 24 de ore$ibanLine, altfel rezervarea va fi anulată automat. " +
+                    "Te anunțăm prin SMS după confirmarea plății.",
+                "Your booking at ${board.name}, $period ($nights $nightsWord), has been saved. " +
+                    "Pay within 24 hours$ibanLine, otherwise the booking will be cancelled automatically. " +
+                    "We will text you once the payment is confirmed.",
+            ) + noShowWarning(context, sender)
         )
     }
 
@@ -677,8 +756,12 @@ class ClientBookingReceiver : BroadcastReceiver() {
         prefs.edit().putString(BLOCK_NOTICE_KEY, notices.toString()).apply()
         sendSms(
             context, sender,
-            "Nu mai poți face rezervări prin SMS din cauza neprezentărilor repetate. " +
-                "Te rugăm să suni la pensiune."
+            tr(
+                "Nu mai poți face rezervări prin SMS din cauza neprezentărilor repetate. " +
+                    "Te rugăm să suni la pensiune.",
+                "You can no longer book by SMS because of repeated no-shows. " +
+                    "Please call the guesthouse.",
+            )
         )
         return true
     }
@@ -688,8 +771,12 @@ class ClientBookingReceiver : BroadcastReceiver() {
         val threshold = NoShowStore.threshold(context)
         val count = NoShowStore.countFor(context, sender)
         if (threshold <= 0 || count <= 0 || count != threshold - 1) return ""
-        return "\nAtenție: ai $count ${if (count == 1) "neprezentare" else "neprezentări"}. " +
-            "La $threshold nu mai poți rezerva prin SMS."
+        return tr(
+            "\nAtenție: ai $count ${if (count == 1) "neprezentare" else "neprezentări"}. " +
+                "La $threshold nu mai poți rezerva prin SMS.",
+            "\nNote: you have $count ${if (count == 1) "no-show" else "no-shows"}. " +
+                "At $threshold you can no longer book by SMS.",
+        )
     }
 
     // ── Flux „anuleaza” / „anulare” ─────────────────────────────────────────────
@@ -739,7 +826,13 @@ class ClientBookingReceiver : BroadcastReceiver() {
         val candidates = findActiveBookings(context, senderDigits)
         when {
             candidates.isEmpty() ->
-                sendSms(context, sender, "Nu am găsit nicio rezervare activă pe acest număr.")
+                sendSms(
+                    context, sender,
+                    tr(
+                        "Nu am găsit nicio rezervare activă pe acest număr.",
+                        "I found no active booking for this number.",
+                    ),
+                )
             candidates.size == 1 -> {
                 clearCancelOffer(context, senderDigits)
                 cancelBooking(context, sender, candidates[0])
@@ -757,8 +850,12 @@ class ClientBookingReceiver : BroadcastReceiver() {
                 val lines = candidates.mapIndexed { i, c -> "${i + 1}. ${c.label}" }
                 sendSms(
                     context, sender,
-                    "Ai mai multe rezervări active:\n${lines.joinToString("\n")}\n" +
-                        "Răspunde cu numărul celei pe care vrei să o anulezi."
+                    tr("Ai mai multe rezervări active:", "You have several active bookings:") +
+                        "\n${lines.joinToString("\n")}\n" +
+                        tr(
+                            "Răspunde cu numărul celei pe care vrei să o anulezi.",
+                            "Reply with the number of the one you want to cancel.",
+                        )
                 )
             }
         }
@@ -767,15 +864,25 @@ class ClientBookingReceiver : BroadcastReceiver() {
     private fun confirmCancel(context: Context, sender: String, senderDigits: String, choice: Int) {
         val offer = getCancelOffer(context, senderDigits)
         if (offer == null) {
-            sendSms(context, sender, "Nu am nicio cerere de anulare activă. Scrie ANULEAZA pentru a o relua.")
+            sendSms(
+                context, sender,
+                tr(
+                    "Nu am nicio cerere de anulare activă. Scrie ANULEAZA pentru a o relua.",
+                    "I have no active cancellation request. Text CANCEL to start again.",
+                ),
+            )
             return
         }
         val candidates = offer.optJSONArray("candidates") ?: JSONArray()
         if (choice < 1 || choice > candidates.length()) {
             sendSms(
                 context, sender,
-                "Opțiune invalidă sau expirată. Răspunde cu un număr din ultimul mesaj primit, " +
-                    "sau scrie ANULEAZA pentru o căutare nouă."
+                tr(
+                    "Opțiune invalidă sau expirată. Răspunde cu un număr din ultimul mesaj primit, " +
+                        "sau scrie ANULEAZA pentru o căutare nouă.",
+                    "Invalid or expired option. Reply with a number from the last message you received, " +
+                        "or text CANCEL for a new search.",
+                )
             )
             return
         }
@@ -803,10 +910,19 @@ class ClientBookingReceiver : BroadcastReceiver() {
         // neplată” peste câteva ore.
         AlarmScheduler.cancelValidationAlarm(context, AlarmScheduler.validationAlarmId(candidate.syncId))
         BotReminders.cancel(context, candidate.syncId)
-        sendSms(context, sender, "Rezervarea ta ${candidate.label} a fost anulată.")
+        sendSms(
+            context, sender,
+            tr(
+                "Rezervarea ta ${candidate.label} a fost anulată.",
+                "Your booking ${candidate.label} has been cancelled.",
+            ),
+        )
         OwnerNotice.show(
-            context, "Rezervare anulată de client",
-            "${candidate.label} — anulată prin SMS de clientul cu numărul ${Diag.mask(sender)}.",
+            context, tr("Rezervare anulată de client", "Booking cancelled by the guest"),
+            tr(
+                "${candidate.label} — anulată prin SMS de clientul cu numărul ${Diag.mask(sender)}.",
+                "${candidate.label} — cancelled by SMS by the guest with the number ${Diag.mask(sender)}.",
+            ),
         )
     }
 

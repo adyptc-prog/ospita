@@ -338,7 +338,7 @@ List<Board>? completeBoards(List<Board> boards) {
   final ids = boards.map((b) => b.id).toSet();
   final added = [
     for (var i = 1; i <= kBoardCount; i++)
-      if (!ids.contains('b$i')) Board(id: 'b$i', name: 'Tabel $i'),
+      if (!ids.contains('b$i')) Board(id: 'b$i', name: tr('Tabel $i', 'Table $i')),
   ];
   if (added.isEmpty || boards.length >= kBoardCount) return null;
   return [...boards, ...added.take(kBoardCount - boards.length)];
@@ -360,8 +360,8 @@ Future<List<Board>> _loadOrMigrateBoards(SharedPreferences prefs) async {
     return completed;
   }
 
-  const b1 = Board(id: 'b1', name: 'Tabel 1');
-  final boards = completeBoards(const [b1])!;
+  final b1 = Board(id: 'b1', name: tr('Tabel 1', 'Table 1'));
+  final boards = completeBoards([b1])!;
 
   final legacyItems = prefs.getString(_kLegacyItemsKey);
   if (legacyItems != null) {

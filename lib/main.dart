@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
@@ -12,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'backup_screen.dart';
 import 'backup_service.dart';
+import 'l10n.dart';
 import 'license_screen.dart';
 import 'license_service.dart';
 import 'no_show.dart';
@@ -24,6 +26,7 @@ part 'src/models.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.init();
+  await AppLang.load();
   runApp(const ManagementApp());
 }
 
@@ -32,7 +35,24 @@ class ManagementApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // La schimbarea limbii, aplicația se reconstruiește de la ecranul
+    // principal (cheia se schimbă), ca toate textele să apară în limba nouă.
+    return ValueListenableBuilder<String>(
+      valueListenable: AppLang.code,
+      builder: (context, lang, _) => _buildApp(lang),
+    );
+  }
+
+  Widget _buildApp(String lang) {
     return MaterialApp(
+      key: ValueKey(lang),
+      locale: Locale(lang),
+      supportedLocales: const [Locale('ro'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       title: 'Rezervări Pensiune',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -91,7 +111,7 @@ class _ManagementPageState extends State<ManagementPage>
   final List<DeletedItem> _deletedBuffer = [];
   Timer? _colorTimer;
   Timer? _syncQueueTimer;
-  String _smsTemplate = _kDefaultSmsTemplate;
+  String _smsTemplate = _defaultSmsTemplate;
   int _alertLeadMin = kDefaultAlertLeadMin;
   DateTime? _attendanceSince;
   // Neprezentările active (6 luni), pe client — din toate tabelele.
@@ -198,14 +218,14 @@ class _ManagementPageState extends State<ManagementPage>
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(children: [
+        title: Row(children: [
           Icon(Icons.sms_failed_outlined, color: Colors.red),
           SizedBox(width: 8),
-          Expanded(child: Text('SMS-urile sunt blocate')),
+          Expanded(child: Text(tr('SMS-urile sunt blocate', 'SMS is blocked'))),
         ]),
-        content: const SingleChildScrollView(
+        content: SingleChildScrollView(
           child: Text(
-            'Fără permisiunea SMS nu pleacă reminderele, confirmările de '
+            tr('Fără permisiunea SMS nu pleacă reminderele, confirmările de '
             'rezervare, sincronizarea și licența către telefonul partener.\n\n'
             'Dacă telefonul spune că setarea e restricționată „pentru '
             'siguranța ta”:\n'
@@ -214,12 +234,21 @@ class _ManagementPageState extends State<ManagementPage>
             'și confirmă.\n'
             '3. Permisiuni → SMS → Permite.\n'
             '4. Revino în aplicație.',
+            'Without the SMS permission, reminders, booking '
+            'confirmations, sync and the license for the partner phone cannot be sent.\n\n'
+            'If the phone says the setting is restricted “for your '
+            'security”:\n'
+            '1. Tap “Open settings”.\n'
+            '2. Tap ⋮ (top right) → “Allow restricted settings” '
+            'and confirm.\n'
+            '3. Permissions → SMS → Allow.\n'
+            '4. Come back to the app.'),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Închide'),
+            child: Text(tr('Închide', 'Close')),
           ),
           TextButton(
             onPressed: () async {
@@ -227,14 +256,14 @@ class _ManagementPageState extends State<ManagementPage>
               await _checkSmsPermission();
               if (ok && ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Cere permisiunea'),
+            child: Text(tr('Cere permisiunea', 'Request permission')),
           ),
           FilledButton(
             onPressed: () async {
               Navigator.pop(ctx);
               await openAppSettings();
             },
-            child: const Text('Deschide setările'),
+            child: Text(tr('Deschide setările', 'Open settings')),
           ),
         ],
       ),
@@ -292,7 +321,7 @@ class _ManagementPageState extends State<ManagementPage>
     final action = await showDialog<({String action, String boardId})>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('Tabele'),
+        title: Text(tr('Tabele', 'Tables')),
         children: _boards.map((b) {
           final isActive = b.id == _activeBoardId;
           // ListTile + trailing IconButton (nu SimpleDialogOption) — ca să
@@ -313,7 +342,7 @@ class _ManagementPageState extends State<ManagementPage>
             ),
             trailing: IconButton(
               icon: const Icon(Icons.edit_outlined, size: 18),
-              tooltip: 'Redenumește',
+              tooltip: tr('Redenumește', 'Rename'),
               onPressed: () =>
                   Navigator.pop(ctx, (action: 'rename', boardId: b.id)),
             ),
@@ -336,21 +365,21 @@ class _ManagementPageState extends State<ManagementPage>
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Redenumește tabelul'),
+        title: Text(tr('Redenumește tabelul', 'Rename table')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-              labelText: 'Nume tabel', border: OutlineInputBorder()),
+          decoration: InputDecoration(
+              labelText: tr('Nume tabel', 'Table name'), border: OutlineInputBorder()),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Anulează'),
+            child: Text(tr('Anulează', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Salvează'),
+            child: Text(tr('Salvează', 'Save')),
           ),
         ],
       ),
@@ -430,7 +459,7 @@ class _ManagementPageState extends State<ManagementPage>
       final prefs   = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString(_itemsKeyFor(_activeBoardId));
       nextNumber    = prefs.getInt(_nextNumberKeyFor(_activeBoardId)) ?? 1;
-      _smsTemplate  = prefs.getString(_kSmsTemplateKey) ?? _kDefaultSmsTemplate;
+      _smsTemplate  = _effectiveSmsTemplate(prefs.getString(_kSmsTemplateKey));
       _bookingSettings = await _loadBookingSettings(prefs, _activeBoardId);
       _alertLeadMin = _loadAlertLead(prefs, _activeBoardId);
       final since = prefs.getString(_kAttendanceSinceKey);
@@ -633,18 +662,21 @@ class _ManagementPageState extends State<ManagementPage>
                 ? b.count.compareTo(a.count)
                 : b.last.compareTo(a.last));
           return AlertDialog(
-            title: const Text('Clienți cu neprezentări'),
+            title: Text(tr('Clienți cu neprezentări', 'Guests with no-shows')),
             content: SizedBox(
               width: 440,
               child: records.isEmpty
-                  ? const Text('Niciun client cu neprezentări în ultimele 6 luni.')
+                  ? Text(tr('Niciun client cu neprezentări în ultimele 6 luni.', 'No guest with no-shows in the last 6 months.'))
                   : ListView(
                       shrinkWrap: true,
                       children: [
                         Text(
-                          'Neprezentările din ultimele 6 luni. O bilă dispare '
+                          tr('Neprezentările din ultimele 6 luni. O bilă dispare '
                           'singură după 6 luni.'
                           '${_noShowBlockThreshold > 0 ? ' La $_noShowBlockThreshold bile, clientul nu mai poate rezerva prin SMS.' : ''}',
+                          'No-shows in the last 6 months. A dot disappears '
+                          'by itself after 6 months.'
+                          '${_noShowBlockThreshold > 0 ? ' At $_noShowBlockThreshold dots, the guest can no longer book by SMS.' : ''}'),
                           style: TextStyle(
                               fontSize: 12, color: Colors.grey.shade600),
                         ),
@@ -667,8 +699,10 @@ class _ManagementPageState extends State<ManagementPage>
                               ],
                             ),
                             subtitle: Text(
-                              'Ultima: ${_formatDateTime(r.last)}'
+                              tr('Ultima: ${_formatDateTime(r.last)}'
                               '${isBlockedBy(r.count, _noShowBlockThreshold) ? ' · blocat la rezervări prin SMS' : ''}',
+                              'Last: ${_formatDateTime(r.last)}'
+                              '${isBlockedBy(r.count, _noShowBlockThreshold) ? ' · blocked from SMS bookings' : ''}'),
                               style: isBlockedBy(r.count, _noShowBlockThreshold)
                                   ? TextStyle(color: Colors.red.shade700)
                                   : null,
@@ -678,18 +712,20 @@ class _ManagementPageState extends State<ManagementPage>
                                 final ok = await showDialog<bool>(
                                   context: ctx,
                                   builder: (c) => AlertDialog(
-                                    title: const Text('Iartă clientul?'),
+                                    title: Text(tr('Iartă clientul?', 'Forgive the guest?')),
                                     content: Text(
-                                        'Cele ${r.count} neprezentări ale lui '
-                                        '${r.name} nu vor mai conta.'),
+                                        tr('Cele ${r.count} neprezentări ale lui '
+                                        '${r.name} nu vor mai conta.',
+                                        'The ${r.count} no-shows of '
+                                        '${r.name} will no longer count.')),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(c, false),
-                                        child: const Text('Anulează'),
+                                        child: Text(tr('Anulează', 'Cancel')),
                                       ),
                                       FilledButton(
                                         onPressed: () => Navigator.pop(c, true),
-                                        child: const Text('Iartă'),
+                                        child: Text(tr('Iartă', 'Forgive')),
                                       ),
                                     ],
                                   ),
@@ -698,7 +734,7 @@ class _ManagementPageState extends State<ManagementPage>
                                 await _forgiveClient(r);
                                 setDs(() {});
                               },
-                              child: const Text('Iartă'),
+                              child: Text(tr('Iartă', 'Forgive')),
                             ),
                           ),
                       ],
@@ -707,7 +743,7 @@ class _ManagementPageState extends State<ManagementPage>
             actions: [
               FilledButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Închide'),
+                child: Text(tr('Închide', 'Close')),
               ),
             ],
           );
@@ -1022,7 +1058,7 @@ class _ManagementPageState extends State<ManagementPage>
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Licența a fost primită de la telefonul partener.'),
+        content: Text(tr('Licența a fost primită de la telefonul partener.', 'The license was received from the partner phone.')),
         backgroundColor: Colors.green.shade700,
       ),
     );
@@ -1034,12 +1070,12 @@ class _ManagementPageState extends State<ManagementPage>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(days <= 1
-            ? 'Licența expiră mâine! Reînnoiește-o pentru a evita întreruperile.'
-            : 'Licența expiră în $days zile. Reînnoiește-o pentru a evita întreruperile.'),
+            ? tr('Licența expiră mâine! Reînnoiește-o pentru a evita întreruperile.', 'The license expires tomorrow! Renew it to avoid interruptions.')
+            : tr('Licența expiră în $days zile. Reînnoiește-o pentru a evita întreruperile.', 'The license expires in $days days. Renew it to avoid interruptions.')),
         backgroundColor: Colors.orange.shade800,
         duration: const Duration(seconds: 6),
         action: SnackBarAction(
-          label: 'Detalii',
+          label: tr('Detalii', 'Details'),
           textColor: Colors.white,
           onPressed: _openLicenseScreen,
         ),
@@ -1054,30 +1090,33 @@ class _ManagementPageState extends State<ManagementPage>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(children: [
+        title: Row(children: [
           Icon(Icons.lock_outline, color: Colors.orange),
           SizedBox(width: 8),
-          Text('Licență necesară'),
+          Text(tr('Licență necesară', 'License required')),
         ]),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Perioada de trial gratuită de 1 lună a expirat.',
+              Text(
+                tr('Perioada de trial gratuită de 1 lună a expirat.', 'The free 1-month trial has expired.'),
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Botul de rezervări prin SMS și reminderele SMS sunt oprite '
+              Text(
+                tr('Botul de rezervări prin SMS și reminderele SMS sunt oprite '
                 'până la activarea licenței. Datele, sincronizarea și '
                 'backup-ul funcționează în continuare.',
+                'The SMS booking bot and SMS reminders are off '
+                'until the license is activated. Your data, sync and '
+                'backup keep working.'),
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Cumpără o licență pe voltacademy.app/pensiune.html folosind codul de instalare de mai jos, apoi importă fișierul descărcat:',
+              Text(
+                tr('Cumpără o licență pe voltacademy.app/pensiune.html folosind codul de instalare de mai jos, apoi importă fișierul descărcat:', 'Buy a license at voltacademy.app/pensiune.html using the installation code below, then import the downloaded file:'),
                 style: TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 8),
@@ -1098,12 +1137,12 @@ class _ManagementPageState extends State<ManagementPage>
                     ),
                     IconButton(
                       icon: const Icon(Icons.copy, size: 18),
-                      tooltip: 'Copiază codul',
+                      tooltip: tr('Copiază codul', 'Copy code'),
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(text: businessId));
                         if (ctx.mounted) {
                           ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('Cod copiat.')),
+                            SnackBar(content: Text(tr('Cod copiat.', 'Code copied.'))),
                           );
                         }
                       },
@@ -1114,7 +1153,7 @@ class _ManagementPageState extends State<ManagementPage>
               const SizedBox(height: 12),
               FilledButton.icon(
                 icon: const Icon(Icons.folder_open),
-                label: const Text('Select License File'),
+                label: Text(tr('Selectează fișierul de licență', 'Select the license file')),
                 onPressed: () async {
                   final r = await LicenseService.pickLicenseFile();
                   if (!ctx.mounted) return;
@@ -1123,7 +1162,7 @@ class _ManagementPageState extends State<ManagementPage>
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(
                       content: Text(r.success
-                          ? 'Licență activată cu succes!'
+                          ? tr('Licență activată cu succes!', 'License activated successfully!')
                           : r.message),
                       backgroundColor: r.success ? Colors.green.shade700 : Colors.red.shade700,
                     ),
@@ -1141,7 +1180,7 @@ class _ManagementPageState extends State<ManagementPage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Închide'),
+            child: Text(tr('Închide', 'Close')),
           ),
         ],
       ),
@@ -1282,7 +1321,7 @@ class _ManagementPageState extends State<ManagementPage>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDs) {
           Widget presetChip(int n) => ChoiceChip(
-                label: Text(n == 1 ? '1 noapte' : '$n nopți'),
+                label: Text(n == 1 ? tr('1 noapte', '1 night') : tr('$n nopți', '$n nights')),
                 selected: !custom && selected == n,
                 onSelected: (_) => setDs(() {
                   selected = n;
@@ -1291,7 +1330,7 @@ class _ManagementPageState extends State<ManagementPage>
               );
 
           return AlertDialog(
-            title: const Text('Spatiere'),
+            title: Text(tr('Spatiere', 'Gaps')),
             content: SizedBox(
               width: 360,
               child: SingleChildScrollView(
@@ -1299,11 +1338,15 @@ class _ManagementPageState extends State<ManagementPage>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Alege lungimea minimă de sejur pentru previzualizare. '
+                    Text(
+                      tr('Alege lungimea minimă de sejur pentru previzualizare. '
                       'Tabelul va afișa golurile de minim atâtea nopți '
                       'dintre sejururile existente. Clienții pot cere prin '
                       'SMS orice altă lungime — asta nu-i limitează.',
+                      'Choose the minimum stay length for the preview. '
+                      'The table will show the gaps of at least that many nights '
+                      'between existing stays. Guests can ask by '
+                      'SMS for any other length — this does not limit them.'),
                       style: TextStyle(fontSize: 13, color: Colors.black54),
                     ),
                     const SizedBox(height: 14),
@@ -1313,7 +1356,7 @@ class _ManagementPageState extends State<ManagementPage>
                       children: [
                         ...presets.map(presetChip),
                         ChoiceChip(
-                          label: const Text('Personalizat'),
+                          label: Text(tr('Personalizat', 'Custom')),
                           selected: custom,
                           onSelected: (_) => setDs(() => custom = true),
                         ),
@@ -1324,8 +1367,8 @@ class _ManagementPageState extends State<ManagementPage>
                       TextField(
                         controller: nightsCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Nopți',
+                        decoration: InputDecoration(
+                          labelText: tr('Nopți', 'Nights'),
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -1337,7 +1380,7 @@ class _ManagementPageState extends State<ManagementPage>
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Anulează'),
+                child: Text(tr('Anulează', 'Cancel')),
               ),
               FilledButton(
                 onPressed: () {
@@ -1348,7 +1391,7 @@ class _ManagementPageState extends State<ManagementPage>
                   if (result <= 0) return;
                   Navigator.pop(ctx, Duration(days: result));
                 },
-                child: const Text('Aplică'),
+                child: Text(tr('Aplică', 'Apply')),
               ),
             ],
           );
@@ -1530,7 +1573,7 @@ class _ManagementPageState extends State<ManagementPage>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDs) => AlertDialog(
-          title: Text(isEdit ? 'Editează înregistrarea' : 'Adaugă înregistrare'),
+          title: Text(isEdit ? tr('Editează înregistrarea', 'Edit entry') : tr('Adaugă înregistrare', 'Add entry')),
           content: SizedBox(
             width: 400,
             child: SingleChildScrollView(
@@ -1539,21 +1582,21 @@ class _ManagementPageState extends State<ManagementPage>
                 children: [
                   TextField(
                     controller: nameCtrl,
-                    decoration: const InputDecoration(
-                        labelText: 'Nume *', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                        labelText: tr('Nume *', 'Name *'), border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: descCtrl,
-                    decoration: const InputDecoration(
-                        labelText: 'Descriere', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                        labelText: tr('Descriere', 'Description'), border: OutlineInputBorder()),
                     maxLines: 3,
                   ),
                   const SizedBox(height: 12),
                   ...[
                     _buildDatePickerRow(
                       label: selectedStart == null
-                          ? 'Check-in: nesetat'
+                          ? tr('Check-in: nesetat', 'Check-in: not set')
                           : 'Check-in: ${_formatDateTime(selectedStart!)}',
                       hasValue: selectedStart != null,
                       onClear: () => setDs(() => selectedStart = null),
@@ -1585,7 +1628,7 @@ class _ManagementPageState extends State<ManagementPage>
                   ],
                   _buildDatePickerRow(
                     label: selectedExpiry == null
-                        ? 'Check-out: nesetat'
+                        ? tr('Check-out: nesetat', 'Check-out: not set')
                         : 'Check-out: ${_formatDateTime(selectedExpiry!)}',
                     hasValue: selectedExpiry != null,
                     onClear: () => setDs(() => selectedExpiry = null),
@@ -1620,7 +1663,7 @@ class _ManagementPageState extends State<ManagementPage>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Anulează'),
+              child: Text(tr('Anulează', 'Cancel')),
             ),
             FilledButton(
               onPressed: () {
@@ -1665,7 +1708,7 @@ class _ManagementPageState extends State<ManagementPage>
                 });
                 Navigator.pop(ctx, true);
               },
-              child: Text(isEdit ? 'Salvează' : 'Adaugă'),
+              child: Text(isEdit ? tr('Salvează', 'Save') : tr('Adaugă', 'Add')),
             ),
           ],
         ),
@@ -1741,7 +1784,7 @@ class _ManagementPageState extends State<ManagementPage>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDs) => AlertDialog(
-          title: const Text('Setează alertă & SMS'),
+          title: Text(tr('Setează alertă & SMS', 'Set alert & SMS')),
           content: SizedBox(
             width: 400,
             child: SingleChildScrollView(
@@ -1756,13 +1799,13 @@ class _ManagementPageState extends State<ManagementPage>
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        'Expiră la: ${_formatDateTime(item.expiresAt!)}',
+                        tr('Expiră la: ${_formatDateTime(item.expiresAt!)}', 'Expires at: ${_formatDateTime(item.expiresAt!)}'),
                         style: TextStyle(
                             fontSize: 12, color: Colors.grey.shade600),
                       ),
                     ),
                   const SizedBox(height: 16),
-                  const Text('Alertă',
+                  Text(tr('Alertă', 'Alert'),
                       style: TextStyle(
                           fontWeight: FontWeight.w600, fontSize: 13)),
                   const SizedBox(height: 8),
@@ -1773,7 +1816,7 @@ class _ManagementPageState extends State<ManagementPage>
                       if (expiresAt != null) ...[
                         for (final p in presets)
                           ChoiceChip(
-                            label: Text('${formatAlertLead(p)} înainte'),
+                            label: Text(tr('${formatAlertLead(p)} înainte', '${formatAlertLead(p)} before')),
                             selected: mode == _AlertMode.lead &&
                                 !custom && leadMin == p,
                             onSelected: (_) => setDs(() {
@@ -1785,7 +1828,7 @@ class _ManagementPageState extends State<ManagementPage>
                             }),
                           ),
                         ChoiceChip(
-                          label: const Text('Personalizat'),
+                          label: Text(tr('Personalizat', 'Custom')),
                           selected: mode == _AlertMode.lead && custom,
                           onSelected: (_) => setDs(() {
                             mode = _AlertMode.lead;
@@ -1794,7 +1837,7 @@ class _ManagementPageState extends State<ManagementPage>
                         ),
                       ],
                       ChoiceChip(
-                        label: const Text('Oră exactă'),
+                        label: Text(tr('Oră exactă', 'Exact time')),
                         selected: mode == _AlertMode.exact,
                         onSelected: (_) => setDs(() {
                           mode = _AlertMode.exact;
@@ -1802,7 +1845,7 @@ class _ManagementPageState extends State<ManagementPage>
                         }),
                       ),
                       ChoiceChip(
-                        label: const Text('Fără alertă'),
+                        label: Text(tr('Fără alertă', 'No alert')),
                         selected: mode == _AlertMode.none,
                         onSelected: (_) =>
                             setDs(() => mode = _AlertMode.none),
@@ -1817,8 +1860,8 @@ class _ManagementPageState extends State<ManagementPage>
                           child: TextField(
                             controller: hoursCtrl,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Ore înainte',
+                            decoration: InputDecoration(
+                              labelText: tr('Ore înainte', 'Hours before'),
                               border: OutlineInputBorder(),
                             ),
                             onChanged: (_) => setDs(() {
@@ -1831,8 +1874,8 @@ class _ManagementPageState extends State<ManagementPage>
                           child: TextField(
                             controller: minutesCtrl,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Minute înainte',
+                            decoration: InputDecoration(
+                              labelText: tr('Minute înainte', 'Minutes before'),
                               border: OutlineInputBorder(),
                             ),
                             onChanged: (_) => setDs(() {
@@ -1847,8 +1890,8 @@ class _ManagementPageState extends State<ManagementPage>
                     const SizedBox(height: 8),
                     _buildDatePickerRow(
                       label: exactWarning == null
-                          ? 'Alertă: nesetată'
-                          : 'Alertă la: ${_formatDateTime(exactWarning!)}',
+                          ? tr('Alertă: nesetată', 'Alert: not set')
+                          : tr('Alertă la: ${_formatDateTime(exactWarning!)}', 'Alert at: ${_formatDateTime(exactWarning!)}'),
                       hasValue: exactWarning != null,
                       icon: Icons.alarm,
                       onClear: () => setDs(() => exactWarning = null),
@@ -1882,22 +1925,24 @@ class _ManagementPageState extends State<ManagementPage>
                       final String text;
                       Color color = Colors.grey.shade700;
                       if (mode == _AlertMode.lead && leadMin <= 0) {
-                        text = '⚠️  Introdu un interval mai mare de 0.';
+                        text = tr('⚠️  Introdu un interval mai mare de 0.', '⚠️  Enter an interval greater than 0.');
                         color = Colors.orange.shade700;
                       } else if (w == null) {
                         text = mode == _AlertMode.none
-                            ? 'Nu se trimite nicio alertă.'
-                            : 'Alertă: nesetată';
+                            ? tr('Nu se trimite nicio alertă.', 'No alert is sent.')
+                            : tr('Alertă: nesetată', 'Alert: not set');
                       } else if (!w.isAfter(DateTime.now())) {
-                        text = '⚠️  Momentul alertei (${_formatDateTime(w)}) '
-                            'a trecut deja — nu se mai trimite.';
+                        text = tr('⚠️  Momentul alertei (${_formatDateTime(w)}) '
+                            'a trecut deja — nu se mai trimite.',
+                        '⚠️  The alert time (${_formatDateTime(w)}) '
+                        'has already passed — it will not be sent.');
                         color = Colors.orange.shade700;
                       } else if (item.expiresAt != null &&
                           w.isAfter(item.expiresAt!)) {
-                        text = '⚠️  Alerta este setată după data de plecare.';
+                        text = tr('⚠️  Alerta este setată după data de plecare.', '⚠️  The alert is set after the departure date.');
                         color = Colors.orange.shade700;
                       } else {
-                        text = 'Alerta pleacă la: ${_formatDateTime(w)}';
+                        text = tr('Alerta pleacă la: ${_formatDateTime(w)}', 'The alert is sent at: ${_formatDateTime(w)}');
                       }
                       return Text(text,
                           style: TextStyle(fontSize: 12, color: color));
@@ -1907,8 +1952,10 @@ class _ManagementPageState extends State<ManagementPage>
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        'Intervalul (înainte de sosire) se folosește automat '
+                        tr('Intervalul (înainte de sosire) se folosește automat '
                         'la toate rezervările noi din acest tabel.',
+                        'The interval (before arrival) is used automatically '
+                        'for all new bookings in this table.'),
                         style: TextStyle(
                             fontSize: 11, color: Colors.grey.shade500),
                       ),
@@ -1916,7 +1963,7 @@ class _ManagementPageState extends State<ManagementPage>
                   const SizedBox(height: 16),
                   const Divider(),
                   const SizedBox(height: 8),
-                  _phoneField(phone1Ctrl, 'Telefon 1 (opțional)', setDs),
+                  _phoneField(phone1Ctrl, tr('Telefon 1 (opțional)', 'Phone 1 (optional)'), setDs),
                   if (_noShowCountFor(phone1Ctrl.text) > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
@@ -1926,8 +1973,10 @@ class _ManagementPageState extends State<ManagementPage>
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              'Clientul are ${_noShowCountFor(phone1Ctrl.text)} '
+                              tr('Clientul are ${_noShowCountFor(phone1Ctrl.text)} '
                               'neprezentări în ultimele 6 luni.',
+                              'The guest has ${_noShowCountFor(phone1Ctrl.text)} '
+                              'no-shows in the last 6 months.'),
                               style: TextStyle(
                                   fontSize: 12, color: Colors.red.shade700),
                             ),
@@ -1936,12 +1985,12 @@ class _ManagementPageState extends State<ManagementPage>
                       ),
                     ),
                   const SizedBox(height: 10),
-                  _phoneField(phone2Ctrl, 'Telefon 2 (opțional)', setDs),
+                  _phoneField(phone2Ctrl, tr('Telefon 2 (opțional)', 'Phone 2 (optional)'), setDs),
                   const SizedBox(height: 10),
-                  _phoneField(phone3Ctrl, 'Telefon 3 (opțional)', setDs),
+                  _phoneField(phone3Ctrl, tr('Telefon 3 (opțional)', 'Phone 3 (optional)'), setDs),
                   const SizedBox(height: 6),
                   Text(
-                    'SMS trimis automat la toate numerele completate.',
+                    tr('SMS trimis automat la toate numerele completate.', 'An SMS is sent automatically to all the numbers filled in.'),
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                   ),
                 ],
@@ -1951,7 +2000,7 @@ class _ManagementPageState extends State<ManagementPage>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Anulează'),
+              child: Text(tr('Anulează', 'Cancel')),
             ),
             FilledButton(
               onPressed: () {
@@ -1974,7 +2023,7 @@ class _ManagementPageState extends State<ManagementPage>
                 }
                 Navigator.pop(ctx, true);
               },
-              child: const Text('Salvează'),
+              child: Text(tr('Salvează', 'Save')),
             ),
           ],
         ),
@@ -2005,17 +2054,17 @@ class _ManagementPageState extends State<ManagementPage>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Șterge înregistrare'),
-        content: Text('Ești sigur că vrei să ștergi "${item.name}"?'),
+        title: Text(tr('Șterge înregistrare', 'Delete entry')),
+        content: Text(tr('Ești sigur că vrei să ștergi "${item.name}"?', 'Are you sure you want to delete "${item.name}"?')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Anulează'),
+            child: Text(tr('Anulează', 'Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Șterge'),
+            child: Text(tr('Șterge', 'Delete')),
           ),
         ],
       ),
@@ -2069,7 +2118,7 @@ class _ManagementPageState extends State<ManagementPage>
           item.expiresAt != null &&
           item.expiresAt!.isAfter(DateTime.now())) {
         await SmsService.sendNow(item.phoneNumber!,
-            'Rezervarea ta la ${_activeBoard.name} a fost anulată de proprietar.');
+            tr('Rezervarea ta la ${_activeBoard.name} a fost anulată de proprietar.', 'Your booking at ${_activeBoard.name} was cancelled by the owner.'));
       }
       await _saveItems();
       await _saveBuffer();
@@ -2091,17 +2140,19 @@ class _ManagementPageState extends State<ManagementPage>
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Anulezi validarea?'),
-          content: Text('Plata pentru "${item.name}" nu va mai fi marcată ca '
-              'confirmată.'),
+          title: Text(tr('Anulezi validarea?', 'Cancel the validation?')),
+          content: Text(tr('Plata pentru "${item.name}" nu va mai fi marcată ca '
+              'confirmată.',
+          'The payment for "${item.name}" will no longer be marked as '
+          'confirmed.')),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Renunță'),
+              child: Text(tr('Renunță', 'Go back')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Anulează validarea'),
+              child: Text(tr('Anulează validarea', 'Cancel validation')),
             ),
           ],
         ),
@@ -2122,7 +2173,7 @@ class _ManagementPageState extends State<ManagementPage>
         updated.phoneNumber != null &&
         updated.phoneNumber!.isNotEmpty) {
       await SmsService.sendNow(updated.phoneNumber!,
-          'Rezervarea ta la ${_activeBoard.name} a fost validată. Te așteptăm!');
+          tr('Rezervarea ta la ${_activeBoard.name} a fost validată. Te așteptăm!', 'Your booking at ${_activeBoard.name} has been validated. We look forward to seeing you!'));
     }
   }
 
@@ -2138,8 +2189,9 @@ class _ManagementPageState extends State<ManagementPage>
     final closedDays = Set<int>.of(_bookingSettings.closedDays);
     final ibanCtrl = TextEditingController(text: _bookingSettings.iban);
 
-    const dayLabels = {
-      1: 'L', 2: 'Ma', 3: 'Mi', 4: 'J', 5: 'V', 6: 'S', 7: 'D',
+    final dayLabels = {
+      1: tr('L', 'Mo'), 2: tr('Ma', 'Tu'), 3: tr('Mi', 'We'), 4: tr('J', 'Th'),
+      5: tr('V', 'Fr'), 6: tr('S', 'Sa'), 7: tr('D', 'Su'),
     };
     var blockThreshold = _noShowBlockThreshold;
     var noShowSms = (await SharedPreferences.getInstance())
@@ -2151,7 +2203,7 @@ class _ManagementPageState extends State<ManagementPage>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDs) => AlertDialog(
-          title: const Text('Rezervări prin SMS'),
+          title: Text(tr('Rezervări prin SMS', 'SMS bookings')),
           content: SizedBox(
             width: 360,
             child: SingleChildScrollView(
@@ -2159,32 +2211,41 @@ class _ManagementPageState extends State<ManagementPage>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Clienții pot trimite SMS cu "liber" (opțional urmat '
+                  Text(
+                    tr('Clienții pot trimite SMS cu "liber" (opțional urmat '
                     'de numele tabelului) ca să rezerve un sejur — '
                     'botul întreabă câte nopți, apoi oferă date '
                     'disponibile și rezervă direct prin SMS, '
                     'răspunzând cu numărul opțiunii.',
+                    'Guests can text "free" (optionally followed '
+                    'by the table name) to book a stay — '
+                    'the bot asks how many nights, then offers the available '
+                    'dates and books directly by SMS, '
+                    'when they reply with the option number.'),
                     style: TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                   const SizedBox(height: 6),
                   // Trebuie să rămână la fel ca BotLimits.kt.
-                  const Text(
-                    'Protecție anti-abuz: botul răspunde doar numerelor de '
+                  Text(
+                    tr('Protecție anti-abuz: botul răspunde doar numerelor de '
                     'telefon, cel mult 15 mesaje pe oră de la același număr '
                     'și 100 de răspunsuri pe zi; un client poate avea cel '
                     'mult 2 rezervări active.',
+                    'Abuse protection: the bot replies only to phone '
+                    'numbers, at most 15 messages per hour from the same number '
+                    'and 100 replies per day; a guest can have at '
+                    'most 2 active bookings.'),
                     style: TextStyle(fontSize: 11, color: Colors.black45),
                   ),
                   const SizedBox(height: 10),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Activ pentru acest tabel'),
+                    title: Text(tr('Activ pentru acest tabel', 'Active for this table')),
                     value: enabled,
                     onChanged: (v) => setDs(() => enabled = v),
                   ),
                   const SizedBox(height: 4),
-                  const Text('Blochează rezervările prin SMS după',
+                  Text(tr('Blochează rezervările prin SMS după', 'Block SMS bookings after'),
                       style: TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
@@ -2193,7 +2254,7 @@ class _ManagementPageState extends State<ManagementPage>
                     children: [
                       for (final n in kNoShowThresholdOptions)
                         ChoiceChip(
-                          label: Text(n == 0 ? 'Niciodată' : '$n neprezentări'),
+                          label: Text(n == 0 ? tr('Niciodată', 'Never') : tr('$n neprezentări', '$n no-shows')),
                           selected: blockThreshold == n,
                           onSelected: (_) => setDs(() => blockThreshold = n),
                         ),
@@ -2202,17 +2263,20 @@ class _ManagementPageState extends State<ManagementPage>
                   const SizedBox(height: 4),
                   Text(
                     blockThreshold == 0
-                        ? 'Clienții cu neprezentări pot rezerva în continuare.'
-                        : 'Pentru toți clienții pensiunii, pe toate tabelele. '
+                        ? tr('Clienții cu neprezentări pot rezerva în continuare.', 'Guests with no-shows can still book.')
+                        : tr('Pentru toți clienții pensiunii, pe toate tabelele. '
                             'Clientul blocat poate fi rezervat manual și '
                             'iertat din lista „Clienți cu neprezentări”.',
+                        'For all guests of the guesthouse, on all tables. '
+                        'A blocked guest can be booked manually and '
+                        'forgiven from the “Guests with no-shows” list.'),
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Anunță clientul prin SMS la neprezentare'),
-                    subtitle: const Text(
-                      'Cu sincronizare pe două telefoane, activează doar pe unul.',
+                    title: Text(tr('Anunță clientul prin SMS la neprezentare', 'Text the guest on a no-show')),
+                    subtitle: Text(
+                      tr('Cu sincronizare pe două telefoane, activează doar pe unul.', 'With sync on two phones, turn it on on only one.'),
                       style: TextStyle(fontSize: 11),
                     ),
                     value: noShowSms,
@@ -2249,7 +2313,7 @@ class _ManagementPageState extends State<ManagementPage>
                     ],
                   ),
                   const SizedBox(height: 8),
-                  const Text('Zile fără check-in',
+                  Text(tr('Zile fără check-in', 'Days without check-in'),
                       style: TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
@@ -2280,9 +2344,11 @@ class _ManagementPageState extends State<ManagementPage>
                         .toList();
                     return Text(
                       open.isEmpty
-                          ? '⚠️  Toate zilele sunt bifate — nu se poate face '
-                              'nicio rezervare.'
-                          : 'Check-in posibil: ${open.join(', ')}',
+                          ? tr('⚠️  Toate zilele sunt bifate — nu se poate face '
+                              'nicio rezervare.',
+                          '⚠️  All days are ticked — no booking '
+                          'can be made.')
+                          : tr('Check-in posibil: ${open.join(', ')}', 'Check-in possible: ${open.join(', ')}'),
                       style: TextStyle(
                           fontSize: 12,
                           color: open.isEmpty
@@ -2295,8 +2361,8 @@ class _ManagementPageState extends State<ManagementPage>
                     TextField(
                       controller: ibanCtrl,
                       textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(
-                        labelText: 'IBAN (pentru SMS-ul de plată)',
+                      decoration: InputDecoration(
+                        labelText: tr('IBAN (pentru SMS-ul de plată)', 'IBAN (for the payment SMS)'),
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -2308,11 +2374,11 @@ class _ManagementPageState extends State<ManagementPage>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Anulează'),
+              child: Text(tr('Anulează', 'Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Salvează'),
+              child: Text(tr('Salvează', 'Save')),
             ),
           ],
         ),
@@ -2365,7 +2431,7 @@ class _ManagementPageState extends State<ManagementPage>
                 size: 22,
               ),
               const SizedBox(width: 8),
-              Text('Sincronizare · ${_activeBoard.name}'),
+              Text(tr('Sincronizare · ${_activeBoard.name}', 'Sync · ${_activeBoard.name}')),
             ],
           ),
           content: SizedBox(
@@ -2390,7 +2456,7 @@ class _ManagementPageState extends State<ManagementPage>
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Sincronizare activă cu:\n${SyncService.partnerPhone}',
+                              tr('Sincronizare activă cu:\n${SyncService.partnerPhone}', 'Sync active with:\n${SyncService.partnerPhone}'),
                               style: TextStyle(
                                   color: Colors.green.shade800,
                                   fontSize: 13),
@@ -2401,13 +2467,13 @@ class _ManagementPageState extends State<ManagementPage>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Modificările se trimit automat prin SMS la fiecare schimbare.',
+                      tr('Modificările se trimit automat prin SMS la fiecare schimbare.', 'Changes are sent automatically by SMS every time something changes.'),
                       style: TextStyle(
                           fontSize: 12, color: Colors.grey.shade600),
                     ),
                     const SizedBox(height: 8),
                     SelectableText(
-                      'Cod de împerechere: ${SyncService.pairingCode ?? ''}',
+                      tr('Cod de împerechere: ${SyncService.pairingCode ?? ''}', 'Pairing code: ${SyncService.pairingCode ?? ''}'),
                       style: const TextStyle(
                           fontSize: 12, fontFamily: 'monospace'),
                     ),
@@ -2415,8 +2481,8 @@ class _ManagementPageState extends State<ManagementPage>
                     TextField(
                       controller: phoneCtrl,
                       keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Număr telefon partener *',
+                      decoration: InputDecoration(
+                        labelText: tr('Număr telefon partener *', 'Partner phone number *'),
                         hintText: '+40712345678',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.phone_outlined),
@@ -2427,18 +2493,20 @@ class _ManagementPageState extends State<ManagementPage>
                       controller: codeCtrl,
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
-                        labelText: 'Cod de împerechere *',
-                        hintText: 'ex. K7QM-2XPA',
+                        labelText: tr('Cod de împerechere *', 'Pairing code *'),
+                        hintText: tr('ex. K7QM-2XPA', 'e.g. K7QM-2XPA'),
                         helperText:
-                            'Același cod pe ambele telefoane. Generează-l pe '
+                            tr('Același cod pe ambele telefoane. Generează-l pe '
                             'unul și tastează-l pe celălalt.',
+                            'The same code on both phones. Generate it on '
+                            'one and type it on the other.'),
                         helperMaxLines: 2,
                         errorText: codeError,
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.key_outlined),
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.casino_outlined),
-                          tooltip: 'Generează cod',
+                          tooltip: tr('Generează cod', 'Generate code'),
                           onPressed: () => setDs(() {
                             codeCtrl.text = SyncService.generateCode();
                             codeError = null;
@@ -2455,11 +2523,16 @@ class _ManagementPageState extends State<ManagementPage>
                         border: Border.all(color: Colors.blue.shade100),
                       ),
                       child: Text(
-                        'La prima sincronizare, toate înregistrările de pe acest '
+                        tr('La prima sincronizare, toate înregistrările de pe acest '
                         'dispozitiv vor fi trimise prin SMS. Ulterior, fiecare '
                         'modificare va fi sincronizată automat.\n\n'
                         'Configurează sincronizarea și pe celălalt dispozitiv, '
                         'cu același cod — mesajele cu alt cod sunt ignorate.',
+                        'On the first sync, all entries on this '
+                        'device are sent by SMS. After that, every '
+                        'change is synced automatically.\n\n'
+                        'Set up sync on the other device as well, '
+                        'with the same code — messages with another code are ignored.'),
                         style: TextStyle(
                             fontSize: 11, color: Colors.blue.shade700),
                       ),
@@ -2473,7 +2546,7 @@ class _ManagementPageState extends State<ManagementPage>
             if (SyncService.isActive)
               TextButton.icon(
                 icon: const Icon(Icons.sync_disabled, color: Colors.red, size: 18),
-                label: const Text('Desincronizează',
+                label: Text(tr('Desincronizează', 'Stop syncing'),
                     style: TextStyle(color: Colors.red)),
                 onPressed: () async {
                   await SyncService.clearPartner();
@@ -2484,18 +2557,18 @@ class _ManagementPageState extends State<ManagementPage>
               ),
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Închide'),
+              child: Text(tr('Închide', 'Close')),
             ),
             if (!SyncService.isActive)
               FilledButton.icon(
                 icon: const Icon(Icons.sync, size: 18),
-                label: const Text('Sincronizează'),
+                label: Text(tr('Sincronizează', 'Sync')),
                 onPressed: () async {
                   final phone = phoneCtrl.text.trim();
                   if (phone.isEmpty) return;
                   if (!SyncService.isValidCode(codeCtrl.text)) {
                     setDs(() => codeError =
-                        'Minim ${SyncService.minCodeLength} litere/cifre.');
+                        tr('Minim ${SyncService.minCodeLength} litere/cifre.', 'At least ${SyncService.minCodeLength} letters/digits.'));
                     return;
                   }
                   if (!await _ensureSmsPermission()) return;
@@ -2517,7 +2590,7 @@ class _ManagementPageState extends State<ManagementPage>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-            'Trimitere sincronizare inițială (${_items.length} înregistrări)...'),
+            tr('Trimitere sincronizare inițială (${_items.length} înregistrări)...', 'Sending initial sync (${_items.length} ${_items.length == 1 ? 'entry' : 'entries'})...')),
         duration: Duration(seconds: _items.length * 2 + 3),
       ),
     );
@@ -2526,8 +2599,8 @@ class _ManagementPageState extends State<ManagementPage>
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sincronizare inițială trimisă!'),
+      SnackBar(
+        content: Text(tr('Sincronizare inițială trimisă!', 'Initial sync sent!')),
         duration: Duration(seconds: 3),
       ),
     );
@@ -2644,26 +2717,26 @@ class _ManagementPageState extends State<ManagementPage>
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('A venit ${item.name}?'),
+        title: Text(tr('A venit ${item.name}?', 'Did ${item.name} arrive?')),
         content: Text(
           item.expiresAt != null
-              ? 'Sejurul s-a încheiat la ${_formatDateTime(item.expiresAt!)}.'
-              : 'Confirmă prezența oaspetelui.',
+              ? tr('Sejurul s-a încheiat la ${_formatDateTime(item.expiresAt!)}.', 'The stay ended on ${_formatDateTime(item.expiresAt!)}.')
+              : tr('Confirmă prezența oaspetelui.', 'Confirm that the guest arrived.'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Anulează'),
+            child: Text(tr('Anulează', 'Cancel')),
           ),
           OutlinedButton.icon(
             icon: Icon(Icons.close, color: Colors.red.shade700),
-            label: Text('Nu a venit',
+            label: Text(tr('Nu a venit', 'Did not arrive'),
                 style: TextStyle(color: Colors.red.shade700)),
             onPressed: () => Navigator.pop(ctx, kNoShow),
           ),
           FilledButton.icon(
             icon: const Icon(Icons.check),
-            label: const Text('A venit'),
+            label: Text(tr('A venit', 'Arrived')),
             style: FilledButton.styleFrom(
                 backgroundColor: Colors.green.shade700),
             onPressed: () => Navigator.pop(ctx, kCame),
@@ -2685,11 +2758,11 @@ class _ManagementPageState extends State<ManagementPage>
           final pending = _items.where(_needsAttendance).toList()
             ..sort((a, b) => a.expiresAt!.compareTo(b.expiresAt!));
           return AlertDialog(
-            title: const Text('Confirmă prezența'),
+            title: Text(tr('Confirmă prezența', 'Confirm attendance')),
             content: SizedBox(
               width: 420,
               child: pending.isEmpty
-                  ? const Text('Toate rezervările sunt confirmate.')
+                  ? Text(tr('Toate rezervările sunt confirmate.', 'All bookings are confirmed.'))
                   : ListView(
                       shrinkWrap: true,
                       children: [
@@ -2702,7 +2775,7 @@ class _ManagementPageState extends State<ManagementPage>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  tooltip: 'Nu a venit',
+                                  tooltip: tr('Nu a venit', 'Did not arrive'),
                                   icon: Icon(Icons.close,
                                       color: Colors.red.shade700),
                                   onPressed: () async {
@@ -2711,7 +2784,7 @@ class _ManagementPageState extends State<ManagementPage>
                                   },
                                 ),
                                 IconButton(
-                                  tooltip: 'A venit',
+                                  tooltip: tr('A venit', 'Arrived'),
                                   icon: Icon(Icons.check,
                                       color: Colors.green.shade700),
                                   onPressed: () async {
@@ -2728,7 +2801,7 @@ class _ManagementPageState extends State<ManagementPage>
             actions: [
               FilledButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Închide'),
+                child: Text(tr('Închide', 'Close')),
               ),
             ],
           );
@@ -2738,11 +2811,11 @@ class _ManagementPageState extends State<ManagementPage>
   }
 
   String _attendanceLabel(Item item) => switch (item.attendance) {
-        kCame   => 'A venit',
+        kCame   => tr('A venit', 'Arrived'),
         kNoShow => item.attendanceAuto
-            ? 'Nu a venit (neconfirmată în 24 de ore)'
-            : 'Nu a venit',
-        _       => _needsAttendance(item) ? 'De confirmat' : '—',
+            ? tr('Nu a venit (neconfirmată în 24 de ore)', 'Did not arrive (not confirmed within 24 hours)')
+            : tr('Nu a venit', 'Did not arrive'),
+        _       => _needsAttendance(item) ? tr('De confirmat', 'To confirm') : '—',
       };
 
   // ── Dialog detalii ───────────────────────────────────────────────────────────
@@ -2757,40 +2830,40 @@ class _ManagementPageState extends State<ManagementPage>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _detailRow('Nr.', item.number.toString()),
+              _detailRow(tr('Nr.', 'No.'), item.number.toString()),
               const SizedBox(height: 10),
-              _detailRow('Descriere',
+              _detailRow(tr('Descriere', 'Description'),
                   item.description.isEmpty ? '—' : item.description),
               const SizedBox(height: 10),
-              _detailRow('Creat la', _formatDateTime(item.createdAt)),
+              _detailRow(tr('Creat la', 'Created'), _formatDateTime(item.createdAt)),
               const SizedBox(height: 10),
               _detailRow(
-                'Expiră la',
+                tr('Expiră la', 'Expires at'),
                 item.expiresAt != null
                     ? _formatDateTime(item.expiresAt!)
-                    : 'Nesetată',
+                    : tr('Nesetată', 'Not set'),
                 valueColor: _isExpired(item) ? Colors.red.shade700 : null,
               ),
               if (item.warningAt != null) ...[
                 const SizedBox(height: 10),
-                _detailRow('Alertă la', _formatDateTime(item.warningAt!),
+                _detailRow(tr('Alertă la', 'Alert at'), _formatDateTime(item.warningAt!),
                     valueColor: Colors.orange.shade700),
               ],
               if (item.phones.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                _detailRow('SMS la', item.phones.join('\n'),
+                _detailRow(tr('SMS la', 'SMS to'), item.phones.join('\n'),
                     valueColor: Colors.blue.shade700),
               ],
               if (_noShowCountFor(item.clientPhone) > 0) ...[
                 const SizedBox(height: 10),
                 _detailRow(
-                    'Neprezentări',
-                    '${_noShowCountFor(item.clientPhone)} în ultimele 6 luni',
+                    tr('Neprezentări', 'No-shows'),
+                    tr('${_noShowCountFor(item.clientPhone)} în ultimele 6 luni', '${_noShowCountFor(item.clientPhone)} in the last 6 months'),
                     valueColor: Colors.red.shade700),
               ],
               if (_isExpired(item)) ...[
                 const SizedBox(height: 10),
-                _detailRow('Prezență', _attendanceLabel(item),
+                _detailRow(tr('Prezență', 'Attendance'), _attendanceLabel(item),
                     valueColor: switch (item.attendance) {
                       kCame   => Colors.green.shade700,
                       kNoShow => Colors.red.shade700,
@@ -2807,18 +2880,18 @@ class _ManagementPageState extends State<ManagementPage>
                 Navigator.pop(ctx);
                 _showAttendanceDialog(item);
               },
-              child: const Text('Prezență'),
+              child: Text(tr('Prezență', 'Attendance')),
             ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               _showItemDialog(existing: item);
             },
-            child: const Text('Editează'),
+            child: Text(tr('Editează', 'Edit')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Închide'),
+            child: Text(tr('Închide', 'Close')),
           ),
         ],
       ),
@@ -2855,11 +2928,11 @@ class _ManagementPageState extends State<ManagementPage>
         if (hasValue)
           IconButton(
               icon: const Icon(Icons.clear, size: 18),
-              tooltip: 'Șterge data',
+              tooltip: tr('Șterge data', 'Clear date'),
               onPressed: onClear),
         TextButton.icon(
           icon: Icon(icon),
-          label: const Text('Alege'),
+          label: Text(tr('Alege', 'Choose')),
           onPressed: onPick,
         ),
       ],
@@ -2928,7 +3001,7 @@ class _ManagementPageState extends State<ManagementPage>
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Text(
-                'Liber',
+                tr('Liber', 'Free'),
                 style: TextStyle(
                   fontSize: 13,
                   fontStyle: FontStyle.italic,
@@ -3021,12 +3094,12 @@ class _ManagementPageState extends State<ManagementPage>
                         : Colors.white54,
               ),
               tooltip: LicenseService.isExpiringSoon
-                  ? 'Licența expiră în ${LicenseService.newLicenseDaysUntilExpiry} zile'
+                  ? tr('Licența expiră în ${LicenseService.newLicenseDaysUntilExpiry} zile', 'The license expires in ${LicenseService.newLicenseDaysUntilExpiry} days')
                   : LicenseService.isLicensed
-                  ? 'Licență activă'
+                  ? tr('Licență activă', 'License active')
                   : LicenseService.isTrialActive
-                      ? 'Trial activ · ${LicenseService.trialDaysLeft} zile rămase'
-                      : 'Trial expirat · activează licența',
+                      ? tr('Trial activ · ${LicenseService.trialDaysLeft} zile rămase', 'Trial active · ${LicenseService.trialDaysLeft} days left')
+                      : tr('Trial expirat · activează licența', 'Trial expired · activate the license'),
               onPressed: _openLicenseScreen,
             ),
           // Buton sincronizare — vizibil doar pe Android
@@ -3039,8 +3112,8 @@ class _ManagementPageState extends State<ManagementPage>
                     : Colors.white54,
               ),
               tooltip: SyncService.isActive
-                  ? 'Sincronizare activă · ${SyncService.partnerPhone}'
-                  : 'Configurează sincronizare',
+                  ? tr('Sincronizare activă · ${SyncService.partnerPhone}', 'Sync active · ${SyncService.partnerPhone}')
+                  : tr('Configurează sincronizare', 'Set up sync'),
               onPressed: _showSyncDialog,
             ),
           // Clienți cu neprezentări — doar când există
@@ -3048,7 +3121,7 @@ class _ManagementPageState extends State<ManagementPage>
             IconButton(
               icon: Icon(Icons.person_off_outlined,
                   color: Colors.redAccent.shade100),
-              tooltip: 'Clienți cu neprezentări',
+              tooltip: tr('Clienți cu neprezentări', 'Guests with no-shows'),
               onPressed: _showNoShowClients,
             ),
           // Buton backup & restaurare — vizibil doar pe Android
@@ -3056,7 +3129,7 @@ class _ManagementPageState extends State<ManagementPage>
             IconButton(
               icon: const Icon(Icons.settings_backup_restore,
                   color: Colors.white70),
-              tooltip: 'Backup & restaurare',
+              tooltip: tr('Backup & restaurare', 'Backup & restore'),
               onPressed: _openBackupScreen,
             ),
           // Buton rezervări prin SMS — vizibil doar pe Android
@@ -3069,8 +3142,8 @@ class _ManagementPageState extends State<ManagementPage>
                     : Colors.white54,
               ),
               tooltip: _bookingSettings.enabled
-                  ? 'Rezervări prin SMS active'
-                  : 'Configurează rezervări prin SMS',
+                  ? tr('Rezervări prin SMS active', 'SMS bookings active')
+                  : tr('Configurează rezervări prin SMS', 'Set up SMS bookings'),
               onPressed: _showBookingSettingsDialog,
             ),
           IconButton(
@@ -3078,7 +3151,7 @@ class _ManagementPageState extends State<ManagementPage>
               _searchVisible ? Icons.search_off : Icons.search,
               color: Colors.white,
             ),
-            tooltip: _searchVisible ? 'Ascunde căutare' : 'Caută',
+            tooltip: _searchVisible ? tr('Ascunde căutare', 'Hide search') : tr('Caută', 'Search'),
             onPressed: () {
               setState(() {
                 _searchVisible = !_searchVisible;
@@ -3088,6 +3161,11 @@ class _ManagementPageState extends State<ManagementPage>
                 }
               });
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.language, color: Colors.white70),
+            tooltip: tr('Limba aplicației', 'App language'),
+            onPressed: _showLanguageDialog,
           ),
           const SizedBox(width: 4),
         ],
@@ -3110,15 +3188,15 @@ class _ManagementPageState extends State<ManagementPage>
                         child: ListTile(
                           leading: Icon(Icons.sms_failed_outlined,
                               color: Colors.red.shade700),
-                          title: Text('SMS-urile sunt blocate',
+                          title: Text(tr('SMS-urile sunt blocate', 'SMS is blocked'),
                               style: TextStyle(
                                   color: Colors.red.shade800,
                                   fontWeight: FontWeight.w600)),
-                          subtitle: const Text(
-                              'Remindere, rezervări și sincronizarea nu funcționează.'),
+                          subtitle: Text(
+                              tr('Remindere, rezervări și sincronizarea nu funcționează.', 'Reminders, bookings and sync are not working.')),
                           trailing: TextButton(
                             onPressed: _showSmsBlockedDialog,
-                            child: const Text('Rezolvă'),
+                            child: Text(tr('Rezolvă', 'Fix')),
                           ),
                           onTap: _showSmsBlockedDialog,
                         ),
@@ -3136,16 +3214,18 @@ class _ManagementPageState extends State<ManagementPage>
                         child: ListTile(
                           leading: Icon(Icons.power_settings_new,
                               color: Colors.orange.shade900),
-                          title: Text('Activează „Pornire automată”',
+                          title: Text(tr('Activează „Pornire automată”', 'Turn on “Autostart”'),
                               style: TextStyle(
                                   color: Colors.orange.shade900,
                                   fontWeight: FontWeight.w600)),
-                          subtitle: const Text(
-                              'Fără ea, cu aplicația închisă, botul nu răspunde '
-                              'la SMS-uri și sincronizarea nu primește nimic.'),
+                          subtitle: Text(
+                              tr('Fără ea, cu aplicația închisă, botul nu răspunde '
+                              'la SMS-uri și sincronizarea nu primește nimic.',
+                              'Without it, with the app closed, the bot does not reply '
+                              'to SMS and sync receives nothing.')),
                           trailing: TextButton(
                             onPressed: SmsService.openAutostartSettings,
-                            child: const Text('Activează'),
+                            child: Text(tr('Activează', 'Activate')),
                           ),
                           onTap: SmsService.openAutostartSettings,
                         ),
@@ -3164,17 +3244,21 @@ class _ManagementPageState extends State<ManagementPage>
                           leading: Icon(Icons.how_to_reg_outlined,
                               color: Colors.orange.shade900),
                           title: Text(
-                              '${_items.where(_needsAttendance).length} '
+                              tr('${_items.where(_needsAttendance).length} '
                               'rezervări de confirmat',
+                              '${_items.where(_needsAttendance).length} '
+                              '${_items.where(_needsAttendance).length == 1 ? 'booking' : 'bookings'} to confirm'),
                               style: TextStyle(
                                   color: Colors.orange.shade900,
                                   fontWeight: FontWeight.w600)),
-                          subtitle: const Text(
-                              'Marchează dacă oaspeții au venit. Neconfirmate '
-                              'în 24 de ore, contează ca neprezentări.'),
+                          subtitle: Text(
+                              tr('Marchează dacă oaspeții au venit. Neconfirmate '
+                              'în 24 de ore, contează ca neprezentări.',
+                              'Mark whether the guests arrived. Not confirmed '
+                              'within 24 hours, they count as no-shows.')),
                           trailing: TextButton(
                             onPressed: _showPendingAttendance,
-                            child: const Text('Confirmă'),
+                            child: Text(tr('Confirmă', 'Confirm')),
                           ),
                           onTap: _showPendingAttendance,
                         ),
@@ -3192,14 +3276,17 @@ class _ManagementPageState extends State<ManagementPage>
                         child: ListTile(
                           leading: Icon(Icons.sms_failed_outlined,
                               color: Colors.orange.shade900),
-                          title: Text('Un SMS nu a putut fi trimis',
+                          title: Text(tr('Un SMS nu a putut fi trimis', 'An SMS could not be sent'),
                               style: TextStyle(
                                   color: Colors.orange.shade900,
                                   fontWeight: FontWeight.w600)),
                           subtitle: Text(
-                              'Către ${_smsFailure!.phone} · '
+                              tr('Către ${_smsFailure!.phone} · '
                               '${SmsService._fmt(_smsFailure!.failedAt)}\n'
-                              '${_smsFailure!.reason}'),
+                              '${_smsFailure!.reason}',
+                              'To ${_smsFailure!.phone} · '
+                              '${SmsService._fmt(_smsFailure!.failedAt)}\n'
+                              '${_smsFailure!.reason}')),
                           isThreeLine: true,
                           trailing: TextButton(
                             onPressed: _dismissSmsFailure,
@@ -3218,7 +3305,7 @@ class _ManagementPageState extends State<ManagementPage>
                               controller: _searchController,
                               autofocus: true,
                               decoration: InputDecoration(
-                                hintText: 'Caută în tabel...',
+                                hintText: tr('Caută în tabel...', 'Search the table...'),
                                 prefixIcon: const Icon(Icons.search),
                                 suffixIcon: _searchQuery.isNotEmpty
                                     ? IconButton(
@@ -3277,11 +3364,11 @@ class _ManagementPageState extends State<ManagementPage>
                                       color: const Color(0xFF1E1B4B),
                                       child: Row(
                                         children: [
-                                          _buildHeaderCell('Nr.',       SortColumn.number,      width: 70),
-                                          _buildHeaderCell('Nume',      SortColumn.name,        width: 160),
-                                          _buildHeaderCell('Descriere', SortColumn.description, width: 200),
-                                          _buildHeaderCell('Creat la',  SortColumn.createdAt,   width: 155),
-                                          _buildHeaderCell('Expiră la', SortColumn.expiresAt,   width: 155),
+                                          _buildHeaderCell(tr('Nr.', 'No.'),       SortColumn.number,      width: 70),
+                                          _buildHeaderCell(tr('Nume', 'Name'),      SortColumn.name,        width: 160),
+                                          _buildHeaderCell(tr('Descriere', 'Description'), SortColumn.description, width: 200),
+                                          _buildHeaderCell(tr('Creat la', 'Created'),  SortColumn.createdAt,   width: 155),
+                                          _buildHeaderCell(tr('Expiră la', 'Expires at'), SortColumn.expiresAt,   width: 155),
                                           SizedBox(width: _actionColWidth),
                                         ],
                                       ),
@@ -3291,8 +3378,8 @@ class _ManagementPageState extends State<ManagementPage>
                                           ? Center(
                                               child: Text(
                                                 _searchQuery.isEmpty
-                                                    ? 'Nu există înregistrări.'
-                                                    : 'Niciun rezultat pentru "$_searchQuery".',
+                                                    ? tr('Nu există înregistrări.', 'There are no entries.')
+                                                    : tr('Niciun rezultat pentru "$_searchQuery".', 'No results for "$_searchQuery".'),
                                                 style: TextStyle(
                                                     color: Colors.grey.shade600),
                                               ),
@@ -3322,7 +3409,7 @@ class _ManagementPageState extends State<ManagementPage>
                                                         _dataCell(
                                                           item.expiresAt != null
                                                               ? _formatDateTime(item.expiresAt!)
-                                                              : 'Nesetată',
+                                                              : tr('Nesetată', 'Not set'),
                                                           width: 155,
                                                           expired: expired,
                                                           muted: !expired && item.expiresAt == null,
@@ -3335,7 +3422,7 @@ class _ManagementPageState extends State<ManagementPage>
                                                             children: [
                                                               _actionBtn(
                                                                 icon: Icons.edit_outlined,
-                                                                tooltip: 'Editează',
+                                                                tooltip: tr('Editează', 'Edit'),
                                                                 onPressed: () =>
                                                                     _showItemDialog(existing: item),
                                                               ),
@@ -3346,7 +3433,7 @@ class _ManagementPageState extends State<ManagementPage>
                                                                     kNoShow => Icons.cancel,
                                                                     _       => Icons.how_to_reg_outlined,
                                                                   },
-                                                                  tooltip: 'Confirmă prezența',
+                                                                  tooltip: tr('Confirmă prezența', 'Confirm attendance'),
                                                                   color: switch (item.attendance) {
                                                                     kCame   => Colors.green.shade700,
                                                                     kNoShow => Colors.red.shade700,
@@ -3358,7 +3445,7 @@ class _ManagementPageState extends State<ManagementPage>
                                                               else
                                                               _actionBtn(
                                                                 icon: Icons.alarm_outlined,
-                                                                tooltip: 'Setează alertă & SMS',
+                                                                tooltip: tr('Setează alertă & SMS', 'Set alert & SMS'),
                                                                 color: item.warningAt != null
                                                                     ? Colors.orange.shade700
                                                                     : item.phoneNumber != null
@@ -3372,8 +3459,8 @@ class _ManagementPageState extends State<ManagementPage>
                                                                       ? Icons.check_circle
                                                                       : Icons.check_circle_outline,
                                                                   tooltip: item.validated
-                                                                      ? 'Anulează validarea'
-                                                                      : 'Validează programarea (plată confirmată)',
+                                                                      ? tr('Anulează validarea', 'Cancel validation')
+                                                                      : tr('Validează programarea (plată confirmată)', 'Validate the booking (payment confirmed)'),
                                                                   color: item.validated
                                                                       ? Colors.green.shade600
                                                                       : null,
@@ -3382,7 +3469,7 @@ class _ManagementPageState extends State<ManagementPage>
                                                                 ),
                                                               _actionBtn(
                                                                 icon: Icons.delete_outlined,
-                                                                tooltip: 'Șterge',
+                                                                tooltip: tr('Șterge', 'Delete'),
                                                                 color: Colors.red.shade400,
                                                                 onPressed: () =>
                                                                     _confirmDelete(item),
@@ -3410,8 +3497,8 @@ class _ManagementPageState extends State<ManagementPage>
                               children: [
                                 Text(
                                   rows.length == _items.length
-                                      ? '${_items.length} înregistrări'
-                                      : '${rows.length} din ${_items.length} înregistrări',
+                                      ? tr('${_items.length} înregistrări', '${_items.length} ${_items.length == 1 ? 'entry' : 'entries'}')
+                                      : tr('${rows.length} din ${_items.length} înregistrări', '${rows.length} of ${_items.length} ${_items.length == 1 ? 'entry' : 'entries'}'),
                                   style: TextStyle(
                                       color: Colors.grey.shade600,
                                       fontSize: 12),
@@ -3430,8 +3517,8 @@ class _ManagementPageState extends State<ManagementPage>
                                   const SizedBox(width: 3),
                                   Text(
                                     LicenseService.isTrialActive
-                                        ? 'Trial · ${LicenseService.trialDaysLeft} zile'
-                                        : 'Trial expirat',
+                                        ? tr('Trial · ${LicenseService.trialDaysLeft} zile', 'Trial · ${LicenseService.trialDaysLeft} days')
+                                        : tr('Trial expirat', 'Trial expired'),
                                     style: TextStyle(
                                         color: LicenseService.isTrialActive
                                             ? Colors.orange.shade700
@@ -3446,7 +3533,7 @@ class _ManagementPageState extends State<ManagementPage>
                                       color: Colors.green.shade600),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'Sincronizat',
+                                    tr('Sincronizat', 'Synced'),
                                     style: TextStyle(
                                         color: Colors.green.shade600,
                                         fontSize: 11),
@@ -3499,26 +3586,26 @@ class _ManagementPageState extends State<ManagementPage>
             children: [
               _bottomBtn(
                 icon: Icons.add_circle_rounded,
-                label: 'Adaugă',
+                label: tr('Adaugă', 'Add'),
                 onTap: () => _showItemDialog(),
                 primary: true,
               ),
               const SizedBox(width: 10),
               _bottomBtn(
                 icon: Icons.bar_chart_rounded,
-                label: 'Raport',
+                label: tr('Raport', 'Report'),
                 onTap: _showReportDialog,
               ),
               const SizedBox(width: 10),
               _bottomBtn(
                 icon: Icons.edit_note_rounded,
-                label: 'Mesaj SMS',
+                label: tr('Mesaj SMS', 'SMS message'),
                 onTap: _showSmsTemplateDialog,
               ),
               const SizedBox(width: 10),
               _bottomBtn(
                 icon: Icons.unfold_more_rounded,
-                label: 'Spatiere',
+                label: tr('Spatiere', 'Gaps'),
                 onTap: _toggleSpatiere,
                 primary: _spatiereActiva,
               ),
@@ -3583,7 +3670,7 @@ class _ManagementPageState extends State<ManagementPage>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDs) => AlertDialog(
-          title: const Text('Generează raport'),
+          title: Text(tr('Generează raport', 'Generate report')),
           content: SizedBox(
             width: 400,
             child: SingleChildScrollView(
@@ -3591,13 +3678,13 @@ class _ManagementPageState extends State<ManagementPage>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Selectează perioada de expirare:',
+                  Text(tr('Selectează perioada de expirare:', 'Select the expiry period:'),
                       style: TextStyle(fontSize: 13, color: Colors.grey)),
                   const SizedBox(height: 12),
                   _buildDatePickerRow(
                     label: from == null
-                        ? 'De la: nesetat'
-                        : 'De la: ${_formatDateTime(from!)}',
+                        ? tr('De la: nesetat', 'From: not set')
+                        : tr('De la: ${_formatDateTime(from!)}', 'From: ${_formatDateTime(from!)}'),
                     hasValue: from != null,
                     icon: Icons.calendar_today,
                     onClear: () => setDs(() => from = null),
@@ -3614,8 +3701,8 @@ class _ManagementPageState extends State<ManagementPage>
                   const SizedBox(height: 8),
                   _buildDatePickerRow(
                     label: to == null
-                        ? 'Până la: nesetat'
-                        : 'Până la: ${_formatDateTime(to!)}',
+                        ? tr('Până la: nesetat', 'Until: not set')
+                        : tr('Până la: ${_formatDateTime(to!)}', 'Until: ${_formatDateTime(to!)}'),
                     hasValue: to != null,
                     icon: Icons.calendar_today,
                     onClear: () => setDs(() => to = null),
@@ -3637,14 +3724,14 @@ class _ManagementPageState extends State<ManagementPage>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Anulează'),
+              child: Text(tr('Anulează', 'Cancel')),
             ),
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
                 _showReportResult(from, to);
               },
-              child: const Text('Generează'),
+              child: Text(tr('Generează', 'Generate')),
             ),
           ],
         ),
@@ -3677,28 +3764,28 @@ class _ManagementPageState extends State<ManagementPage>
         List<ReportEntry> all, String period, int actCnt, int delCnt) {
       final buf = StringBuffer();
       buf.writeln('═══════════════════════════════════════');
-      buf.writeln('         RAPORT REZERVĂRI PENSIUNE');
+      buf.writeln(tr('         RAPORT REZERVĂRI PENSIUNE', '         REZERVĂRI PENSIUNE REPORT'));
       buf.writeln('═══════════════════════════════════════');
-      buf.writeln('Perioadă : $period');
-      buf.writeln('Total    : ${all.length} înregistrări');
+      buf.writeln(tr('Perioadă : $period', 'Period   : $period'));
+      buf.writeln(tr('Total    : ${all.length} înregistrări', 'Total    : ${all.length} ${all.length == 1 ? 'entry' : 'entries'}'));
       buf.writeln('  Active : $actCnt');
-      buf.writeln('  Șterse : $delCnt');
+      buf.writeln(tr('  Șterse : $delCnt', '  Deleted: $delCnt'));
       buf.writeln('───────────────────────────────────────');
       for (final e in all) {
         buf.writeln('');
-        final del = e.deletedAt != null ? ' [ȘTERS]' : '';
+        final del = e.deletedAt != null ? tr(' [ȘTERS]', ' [DELETED]') : '';
         buf.writeln('• ${e.item.name}$del');
-        buf.writeln('  Expiră  : ${e.item.expiresAt != null ? _formatDateTime(e.item.expiresAt!) : "nesetată"}');
+        buf.writeln(tr('  Expiră  : ${e.item.expiresAt != null ? _formatDateTime(e.item.expiresAt!) : "nesetată"}', '  Expires : ${e.item.expiresAt != null ? _formatDateTime(e.item.expiresAt!) : "not set"}'));
         if (e.deletedAt != null) {
-          buf.writeln('  Șters la: ${_formatDateTime(e.deletedAt!)}');
+          buf.writeln(tr('  Șters la: ${_formatDateTime(e.deletedAt!)}', '  Deleted : ${_formatDateTime(e.deletedAt!)}'));
         }
         if (e.item.description.isNotEmpty) {
-          buf.writeln('  Descriere: ${e.item.description}');
+          buf.writeln(tr('  Descriere: ${e.item.description}', '  Description: ${e.item.description}'));
         }
       }
       buf.writeln('');
       buf.writeln('═══════════════════════════════════════');
-      buf.writeln('Generat la: ${_formatDateTime(DateTime.now())}');
+      buf.writeln(tr('Generat la: ${_formatDateTime(DateTime.now())}', 'Generated: ${_formatDateTime(DateTime.now())}'));
       return buf.toString();
     }
 
@@ -3714,19 +3801,19 @@ class _ManagementPageState extends State<ManagementPage>
 
     final period = (from != null || to != null)
         ? '${from != null ? _formatDateTime(from) : "—"}  →  ${to != null ? _formatDateTime(to) : "—"}'
-        : 'Toate înregistrările';
+        : tr('Toate înregistrările', 'All entries');
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Raport programări'),
+        title: Text(tr('Raport programări', 'Bookings report')),
         content: SizedBox(
           width: 480,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Perioadă: $period',
+              Text(tr('Perioadă: $period', 'Period: $period'),
                   style: const TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 2),
               RichText(
@@ -3743,7 +3830,7 @@ class _ManagementPageState extends State<ManagementPage>
                     const TextSpan(text: '  +  '),
                     TextSpan(
                         text:
-                            '${deletedItems.length} șterse din buffer)',
+                            tr('${deletedItems.length} șterse din buffer)', '${deletedItems.length} deleted, from the buffer)'),
                         style:
                             TextStyle(color: Colors.red.shade700)),
                   ],
@@ -3751,7 +3838,7 @@ class _ManagementPageState extends State<ManagementPage>
               ),
               const SizedBox(height: 12),
               if (all.isEmpty)
-                const Text('Nu există înregistrări în această perioadă.')
+                Text(tr('Nu există înregistrări în această perioadă.', 'There are no entries in this period.'))
               else
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 400),
@@ -3815,7 +3902,7 @@ class _ManagementPageState extends State<ManagementPage>
                                                 BorderRadius.circular(4),
                                           ),
                                           child: Text(
-                                            'ȘTERS',
+                                            tr('ȘTERS', 'DELETED'),
                                             style: TextStyle(
                                                 fontSize: 10,
                                                 color: Colors.grey.shade600,
@@ -3827,8 +3914,8 @@ class _ManagementPageState extends State<ManagementPage>
                                   ),
                                   Text(
                                     item.expiresAt != null
-                                        ? 'Expiră: ${_formatDateTime(item.expiresAt!)}'
-                                        : 'Fără dată de expirare',
+                                        ? tr('Expiră: ${_formatDateTime(item.expiresAt!)}', 'Expires: ${_formatDateTime(item.expiresAt!)}')
+                                        : tr('Fără dată de expirare', 'No expiry date'),
                                     style: TextStyle(
                                         fontSize: 12,
                                         color: isDeleted
@@ -3839,7 +3926,7 @@ class _ManagementPageState extends State<ManagementPage>
                                   ),
                                   if (isDeleted)
                                     Text(
-                                      'Șters la: ${_formatDateTime(entry.deletedAt!)}',
+                                      tr('Șters la: ${_formatDateTime(entry.deletedAt!)}', 'Deleted: ${_formatDateTime(entry.deletedAt!)}'),
                                       style: TextStyle(
                                           fontSize: 11,
                                           color: Colors.grey.shade500),
@@ -3864,12 +3951,12 @@ class _ManagementPageState extends State<ManagementPage>
               final text = buildExportText(
                   all, period, activeItems.length, deletedItems.length);
               SharePlus.instance.share(
-                  ShareParams(text: text, subject: 'Raport Rezervări Pensiune'));
+                  ShareParams(text: text, subject: tr('Raport Rezervări Pensiune', 'Rezervări Pensiune report')));
             },
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Închide'),
+            child: Text(tr('Închide', 'Close')),
           ),
         ],
       ),
@@ -3904,6 +3991,42 @@ class _ManagementPageState extends State<ManagementPage>
     }
   }
 
+  // ── Dialog limba aplicației ──────────────────────────────────────────────────
+  // Limba aleasă se aplică interfeței, notificărilor, botului SMS și
+  // mesajelor trimise clienților de pe acest telefon.
+  Future<void> _showLanguageDialog() async {
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(tr('Limba aplicației', 'App language')),
+        children: [
+          for (final (code, name) in const [('ro', 'Română'), ('en', 'English')])
+            ListTile(
+              leading: Icon(
+                AppLang.code.value == code
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+              ),
+              title: Text(name),
+              onTap: () => Navigator.pop(ctx, code),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Text(
+              tr('Botul SMS și mesajele către clienți folosesc limba aleasă aici. '
+                      'Botul înțelege mereu comenzile în ambele limbi.',
+                  'The SMS bot and the messages to clients use the language chosen here. '
+                      'The bot always understands commands in both languages.'),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (chosen == null || chosen == AppLang.code.value) return;
+    await AppLang.set(chosen);
+  }
+
   // ── Dialog editare template SMS ───────────────────────────────────────────────
   Future<void> _showSmsTemplateDialog() async {
     final ctrl = TextEditingController(text: _smsTemplate);
@@ -3911,7 +4034,7 @@ class _ManagementPageState extends State<ManagementPage>
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Editează mesaj SMS'),
+        title: Text(tr('Editează mesaj SMS', 'Edit SMS message')),
         content: SizedBox(
           width: 400,
           child: SingleChildScrollView(
@@ -3919,31 +4042,31 @@ class _ManagementPageState extends State<ManagementPage>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Variabile disponibile:',
+                Text(
+                  tr('Variabile disponibile:', 'Available variables:'),
                   style: TextStyle(
                       fontWeight: FontWeight.w600, fontSize: 13),
                 ),
                 const SizedBox(height: 4),
-                _templateChip('[NUME]',          'Numele înregistrării'),
-                _templateChip('[DATA_EXPIRARE]', 'Data și ora expirării'),
+                _templateChip(tr('[NUME]', '[NAME]'), tr('Numele înregistrării', 'The name of the entry')),
+                _templateChip(tr('[DATA_EXPIRARE]', '[EXPIRY_DATE]'), tr('Data și ora expirării', 'The expiry date and time')),
                 const SizedBox(height: 12),
                 TextField(
                   controller: ctrl,
                   maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'Template mesaj',
+                  decoration: InputDecoration(
+                    labelText: tr('Template mesaj', 'Message template'),
                     border: OutlineInputBorder(),
                     helperText:
-                        'La trimitere, variabilele sunt înlocuite automat.',
+                        tr('La trimitere, variabilele sunt înlocuite automat.', 'When the message is sent, the variables are replaced automatically.'),
                     helperMaxLines: 2,
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextButton.icon(
                   icon: const Icon(Icons.restart_alt, size: 16),
-                  label: const Text('Resetează la implicit'),
-                  onPressed: () => ctrl.text = _kDefaultSmsTemplate,
+                  label: Text(tr('Resetează la implicit', 'Reset to default')),
+                  onPressed: () => ctrl.text = _defaultSmsTemplate,
                 ),
               ],
             ),
@@ -3952,7 +4075,7 @@ class _ManagementPageState extends State<ManagementPage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Anulează'),
+            child: Text(tr('Anulează', 'Cancel')),
           ),
           FilledButton(
             onPressed: () async {
@@ -3965,7 +4088,7 @@ class _ManagementPageState extends State<ManagementPage>
               Navigator.pop(ctx);
               await _rescheduleSmsAllBoards(tmpl);
             },
-            child: const Text('Salvează'),
+            child: Text(tr('Salvează', 'Save')),
           ),
         ],
       ),

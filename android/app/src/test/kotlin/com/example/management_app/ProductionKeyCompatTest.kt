@@ -33,12 +33,12 @@ class ProductionKeyCompatTest {
         val tampered = JSONObject(license.toString())
         tampered.getJSONObject("payload").put("validUntil", "2099-01-01T00:00:00Z")
         val r = verifier.evaluate(tampered.toString(), "pensiune-1700000000000", jan15)
-        assertEquals("License signature is invalid.", r.message)
+        assertEquals("Semnătura licenței nu este validă.", r.message)
     }
 
     @Test
     fun `licenta de test e expirata azi`() {
         val r = verifier.evaluate(license.toString(), "pensiune-1700000000000", System.currentTimeMillis())
-        assertEquals("License has expired.", r.message)
+        assertEquals("Licența a expirat.", r.message)
     }
 }

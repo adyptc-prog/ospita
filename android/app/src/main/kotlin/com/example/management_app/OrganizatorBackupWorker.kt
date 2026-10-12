@@ -21,6 +21,7 @@ class OrganizatorBackupWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
+        AppLang.sync(appContext)
         if (BackupManager.folderUri(appContext) == null) return Result.success()
         try {
             BackupManager.createBackup(appContext, auto = true)
@@ -28,7 +29,7 @@ class OrganizatorBackupWorker(
             val message = e.message ?: e.toString()
             BackupManager.recordAutoError(appContext, message)
             // Altfel eșecul se vedea doar deschizând ecranul Backup.
-            OwnerNotice.show(appContext, "Backup-ul automat a eșuat", message)
+            OwnerNotice.show(appContext, tr("Backup-ul automat a eșuat", "The automatic backup failed"), message)
         }
         return Result.success()
     }

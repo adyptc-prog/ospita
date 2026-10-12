@@ -53,16 +53,16 @@ class NotificationService {
       await _schedule(
         id: base + item.number * 10 + 1,
         when: item.warningAt!,
-        title: '⚠️ Alertă: ${item.name}',
-        body: 'Va expira la ${_fmt(item.expiresAt!)}',
+        title: tr('⚠️ Alertă: ${item.name}', '⚠️ Alert: ${item.name}'),
+        body: tr('Va expira la ${_fmt(item.expiresAt!)}', 'It expires on ${_fmt(item.expiresAt!)}'),
       );
     }
     if (item.expiresAt != null && item.expiresAt!.isAfter(now)) {
       await _schedule(
         id: base + item.number * 10 + 2,
         when: item.expiresAt!,
-        title: 'Sejur încheiat: ${item.name}',
-        body: 'A venit? Confirmă prezența în aplicație.',
+        title: tr('Sejur încheiat: ${item.name}', 'Stay ended: ${item.name}'),
+        body: tr('A venit? Confirmă prezența în aplicație.', 'Did they arrive? Confirm attendance in the app.'),
       );
     }
   }
@@ -196,7 +196,8 @@ class SmsService {
   }
 
   static Future<void> scheduleFor(Item item,
-      {String template = _kDefaultSmsTemplate, required int boardIndex}) async {
+      {String? template, required int boardIndex}) async {
+    final tpl = _effectiveSmsTemplate(template);
     if (!isAndroid) return;
     // Așteptăm anularea: altfel ștergerea payload-ului vechi (sms_alarm_<id>)
     // și anularea nativă pot ajunge DUPĂ programarea nouă, sub același id.
@@ -205,17 +206,19 @@ class SmsService {
     if (phones.isEmpty) return;
 
     final now       = DateTime.now();
-    final expiryStr = item.expiresAt != null ? _fmt(item.expiresAt!) : 'nesetată';
+    final expiryStr = item.expiresAt != null ? _fmt(item.expiresAt!) : tr('nesetată', 'not set');
     String buildMsg(String tmpl) => tmpl
         .replaceAll('[NUME]', item.name)
-        .replaceAll('[DATA_EXPIRARE]', expiryStr);
+        .replaceAll('[NAME]', item.name)
+        .replaceAll('[DATA_EXPIRARE]', expiryStr)
+        .replaceAll('[EXPIRY_DATE]', expiryStr);
 
     if (item.warningAt != null && item.warningAt!.isAfter(now)) {
       final ids = _warnIds(item.number, boardIndex);
       for (var i = 0; i < phones.length && i < ids.length; i++) {
         await _schedule(
             id: ids[i], when: item.warningAt!, phone: phones[i],
-            message: buildMsg(template));
+            message: buildMsg(tpl));
       }
     }
     if (!item.viaBot && item.expiresAt != null && item.expiresAt!.isAfter(now)) {
@@ -223,7 +226,7 @@ class SmsService {
       for (var i = 0; i < phones.length && i < ids.length; i++) {
         await _schedule(
             id: ids[i], when: item.expiresAt!, phone: phones[i],
-            message: 'EXPIRAT: ${buildMsg(template)}');
+            message: tr('EXPIRAT: ${buildMsg(tpl)}', 'EXPIRED: ${buildMsg(tpl)}'));
       }
     }
   }

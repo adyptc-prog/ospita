@@ -37,6 +37,7 @@ class ValidationDeadlineReceiver : BroadcastReceiver() {
     }
 
     private fun handle(context: Context, alarmId: Int) {
+        AppLang.sync(context)
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val dataStr = prefs.getString("flutter.validation_alarm_$alarmId", null) ?: return
         val data = JSONObject(dataStr)
@@ -54,14 +55,20 @@ class ValidationDeadlineReceiver : BroadcastReceiver() {
         val boardName = BookingSettings.loadBoards(context).firstOrNull { it.id == boardId }?.name ?: ""
         SmsSyncReceiver.enqueueLocal(context, boardId, "PEN:D:$syncId")
         OwnerNotice.show(
-            context, "Rezervare anulată automat",
-            "${item.name} ($boardName) — plata nu a fost confirmată în 24 de ore.",
+            context, tr("Rezervare anulată automat", "Booking cancelled automatically"),
+            tr(
+                "${item.name} ($boardName) — plata nu a fost confirmată în 24 de ore.",
+                "${item.name} ($boardName) — the payment was not confirmed within 24 hours.",
+            ),
         )
 
         val phone = item.phones.firstOrNull() ?: return
         sendSmsNow(
             context, phone,
-            "Rezervarea ta la $boardName a fost anulată automat — plata nu a fost confirmată în cele 24 de ore."
+            tr(
+                "Rezervarea ta la $boardName a fost anulată automat — plata nu a fost confirmată în cele 24 de ore.",
+                "Your booking at $boardName was cancelled automatically — the payment was not confirmed within 24 hours.",
+            )
         )
     }
 

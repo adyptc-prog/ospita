@@ -28,7 +28,7 @@ object OwnerNotice {
         nm.createNotificationChannel(
             NotificationChannel(
                 NotifAlarmReceiver.CHANNEL_ID,
-                "Alerte Rezervări Pensiune",
+                tr("Alerte Rezervări Pensiune", "Rezervări Pensiune alerts"),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply { enableVibration(true) }
         )
@@ -36,6 +36,7 @@ object OwnerNotice {
 
     fun show(context: Context, title: String, body: String) {
         try {
+            AppLang.sync(context)
             ensureChannel(context)
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val iconRes = context.resources.getIdentifier("ic_launcher", "mipmap", context.packageName)

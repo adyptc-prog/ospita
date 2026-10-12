@@ -58,16 +58,33 @@ String formatAlertLead(int minutes) {
   if (minutes < 60) return '$minutes min';
   if (minutes % 1440 == 0) {
     final d = minutes ~/ 1440;
-    return '$d ${d == 1 ? "zi" : "zile"}';
+    return tr('$d ${d == 1 ? "zi" : "zile"}', '$d ${d == 1 ? "day" : "days"}');
   }
   final h = minutes ~/ 60;
   final m = minutes % 60;
-  if (m == 0) return '$h ${h == 1 ? "oră" : "ore"}';
+  if (m == 0) return tr('$h ${h == 1 ? "oră" : "ore"}', '$h ${h == 1 ? "hour" : "hours"}');
   return '${h}h ${m}min';
 }
 
-const _kDefaultSmsTemplate =
+// Identice cu DEFAULT_TEMPLATE_RO / DEFAULT_TEMPLATE_EN din BotReminders.kt.
+const _kDefaultSmsTemplateRo =
     'Alertă: [NUME]. Va expira la [DATA_EXPIRARE]. Te rugăm să iei măsurile necesare.';
+const _kDefaultSmsTemplateEn =
+    'Reminder: [NAME]. It expires on [EXPIRY_DATE]. Please take the necessary steps.';
+
+// Mesajul implicit urmează limba aplicației. Un mesaj salvat identic cu unul
+// din cele implicite e tratat tot ca implicit; unul editat de utilizator
+// rămâne neatins la schimbarea limbii.
+String get _defaultSmsTemplate =>
+    tr(_kDefaultSmsTemplateRo, _kDefaultSmsTemplateEn);
+
+String _effectiveSmsTemplate(String? saved) =>
+    (saved == null ||
+            saved.trim().isEmpty ||
+            saved == _kDefaultSmsTemplateRo ||
+            saved == _kDefaultSmsTemplateEn)
+        ? _defaultSmsTemplate
+        : saved;
 
 enum _AlertMode { lead, exact, none }
 
