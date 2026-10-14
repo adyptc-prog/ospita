@@ -1,6 +1,5 @@
 package com.example.management_app
 
-import java.time.LocalDate
 import java.time.LocalDateTime
 
 /** O perioadă liberă: [start, end) — check-in → check-out. */
@@ -34,22 +33,23 @@ object DayRangeCalculator {
         val lastDay = day.plusDays(horizonDays.toLong())
 
         while (!day.isAfter(lastDay) && result.size < maxResults) {
-            val checkIn = day.atStartOfDay().plusMinutes(settings.workStartMin.toLong())
-            val checkOut = day.plusDays(nights.toLong())
-                .atStartOfDay().plusMinutes(settings.workEndMin.toLong())
+            // Orele țin de ziua sosirii; fără ele, în acea zi nu se face check-in.
+            val hours = settings.workHours[day.dayOfWeek.value]
+            if (hours != null) {
+                val checkIn = day.atStartOfDay().plusMinutes(hours.checkInMin.toLong())
+                val checkOut = day.plusDays(nights.toLong())
+                    .atStartOfDay().plusMinutes(hours.checkOutMin.toLong())
 
-            if (!checkIn.isBefore(from) && !isClosed(day, settings.closedDays)) {
-                val overlaps = sortedBusy.any {
-                    it.startMin.isBefore(checkOut) && it.endMin.isAfter(checkIn)
+                if (!checkIn.isBefore(from)) {
+                    val overlaps = sortedBusy.any {
+                        it.startMin.isBefore(checkOut) && it.endMin.isAfter(checkIn)
+                    }
+                    if (!overlaps) result.add(FreeSlot(checkIn, checkOut))
                 }
-                if (!overlaps) result.add(FreeSlot(checkIn, checkOut))
             }
             day = day.plusDays(1)
         }
 
         return result
     }
-
-    private fun isClosed(day: LocalDate, closedDays: Set<Int>): Boolean =
-        closedDays.contains(day.dayOfWeek.value)
 }

@@ -8,13 +8,16 @@ import java.time.format.DateTimeFormatter
 
 data class BoardInfo(val id: String, val name: String)
 
+// Orele sejururilor care încep într-o anumită zi a săptămânii (minute de la
+// miezul nopții): check-in în ziua sosirii, check-out în ziua plecării.
+data class DayHours(val checkInMin: Int, val checkOutMin: Int)
+
 data class BoardBookingSettings(
     val enabled: Boolean,
-    // Ora de check-in / check-out (minute de la miezul nopții).
-    val workStartMin: Int,
-    val workEndMin: Int,
-    // Zile în care nu se acceptă check-in.
-    val closedDays: Set<Int>, // 1=luni .. 7=duminică, la fel ca DateTime.weekday din Dart
+    // Zilele în care se acceptă check-in (1=luni .. 7=duminică, la fel ca
+    // DateTime.weekday din Dart), fiecare cu orele ei; în zilele care lipsesc
+    // nu se face check-in.
+    val workHours: Map<Int, DayHours>,
     // Cont bancar afișat clientului în SMS-ul „așteaptă validarea plății”.
     // Gol dacă proprietarul nu l-a completat.
     val iban: String,
@@ -71,17 +74,43 @@ object BookingSettings {
 
     fun loadSettings(context: Context, boardId: String): BoardBookingSettings {
         val p = prefs(context)
-        val closedStr = p.getString("flutter.closed_days_$boardId", "") ?: ""
-        val closed = closedStr.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
+        val hoursStr = p.getString("flutter.work_hours_$boardId", null)
         val result = BoardBookingSettings(
             enabled = p.getBoolean("flutter.booking_enabled_$boardId", false),
-            workStartMin = getIntCompat(p, "flutter.work_start_$boardId", 14 * 60),
-            workEndMin = getIntCompat(p, "flutter.work_end_$boardId", 11 * 60),
-            closedDays = closed,
+            workHours = if (hoursStr != null) parseWorkHours(hoursStr) else legacyWorkHours(p, boardId),
             iban = p.getString("flutter.iban_$boardId", "") ?: "",
         )
         Diag.i("loadSettings: boardId=$boardId -> $result")
         return result
+    }
+
+    private val WORK_HOURS_ENTRY = Regex("""^(\d+):(\d+)-(\d+)$""")
+
+    // „1:840-660,5:960-720” (zi:check-in-check-out) — scris de
+    // encodeWorkHours din Dart; intrările invalide sunt sărite.
+    fun parseWorkHours(raw: String): Map<Int, DayHours> {
+        val result = mutableMapOf<Int, DayHours>()
+        for (part in raw.split(",")) {
+            val m = WORK_HOURS_ENTRY.matchEntire(part.trim()) ?: continue
+            val day = m.groupValues[1].toIntOrNull() ?: continue
+            val checkIn = m.groupValues[2].toIntOrNull() ?: continue
+            val checkOut = m.groupValues[3].toIntOrNull() ?: continue
+            if (day !in 1..7 || checkIn >= 24 * 60 || checkOut >= 24 * 60) continue
+            result[day] = DayHours(checkIn, checkOut)
+        }
+        return result
+    }
+
+    // Setările salvate în formatul vechi (înainte de orele pe zile): aceleași
+    // ore în toate zilele, mai puțin cele fără check-in.
+    private fun legacyWorkHours(p: android.content.SharedPreferences, boardId: String): Map<Int, DayHours> {
+        val closedStr = p.getString("flutter.closed_days_$boardId", "") ?: ""
+        val closed = closedStr.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
+        val hours = DayHours(
+            getIntCompat(p, "flutter.work_start_$boardId", 14 * 60),
+            getIntCompat(p, "flutter.work_end_$boardId", 11 * 60),
+        )
+        return (1..7).filter { it !in closed }.associateWith { hours }
     }
 
     // Cu câte minute înainte de expirare vine alerta — ultima valoare aleasă

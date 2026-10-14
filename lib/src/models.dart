@@ -255,65 +255,126 @@ class Board {
 }
 
 // ─── Setări rezervări prin SMS (per tabel) ────────────────────────────────────
+/// Orele sejururilor care încep într-o anumită zi a săptămânii (minute de la
+/// miezul nopții): check-in în ziua sosirii, check-out în ziua plecării.
+class DayHours {
+  final int checkInMin;
+  final int checkOutMin;
+  const DayHours(this.checkInMin, this.checkOutMin);
+
+  @override
+  bool operator ==(Object other) =>
+      other is DayHours &&
+      other.checkInMin == checkInMin &&
+      other.checkOutMin == checkOutMin;
+
+  @override
+  int get hashCode => Object.hash(checkInMin, checkOutMin);
+}
+
+const _kDefaultDayHours = DayHours(14 * 60, 11 * 60);
+
+/// „840” → „14:00”.
+String formatMinutesOfDay(int minutes) =>
+    '${(minutes ~/ 60).toString().padLeft(2, '0')}:'
+    '${(minutes % 60).toString().padLeft(2, '0')}';
+
+/// Orele pe zile ↔ textul salvat („1:840-660,5:960-720”). Intrările invalide
+/// sunt sărite. Aceeași regulă ca parseWorkHours din BookingSettings.kt.
+String encodeWorkHours(Map<int, DayHours> hours) => (hours.keys.toList()..sort())
+    .map((d) => '$d:${hours[d]!.checkInMin}-${hours[d]!.checkOutMin}')
+    .join(',');
+
+Map<int, DayHours> parseWorkHours(String raw) {
+  final result = <int, DayHours>{};
+  for (final part in raw.split(',')) {
+    final m = RegExp(r'^(\d+):(\d+)-(\d+)$').firstMatch(part.trim());
+    if (m == null) continue;
+    final day = int.parse(m[1]!);
+    final checkIn = int.parse(m[2]!);
+    final checkOut = int.parse(m[3]!);
+    if (day < 1 || day > 7 || checkIn >= 24 * 60 || checkOut >= 24 * 60) {
+      continue;
+    }
+    result[day] = DayHours(checkIn, checkOut);
+  }
+  return result;
+}
+
 class BookingSettingsData {
   final bool enabled;
-  // Ora fixă de check-in / check-out (minute de la miezul nopții).
-  final int  workStartMin;
-  final int  workEndMin;
-  // Zile în care nu se acceptă check-in.
-  final Set<int> closedDays; // DateTime.weekday: 1=luni .. 7=duminică
+  // Zilele în care se acceptă check-in (DateTime.weekday: 1=luni ..
+  // 7=duminică), fiecare cu orele ei; în zilele care lipsesc nu se face
+  // check-in.
+  final Map<int, DayHours> workHours;
   // Cont bancar (IBAN) afișat clientului în SMS-ul „așteaptă validarea
   // plății”. Gol dacă nu a fost completat.
   final String iban;
 
   const BookingSettingsData({
     required this.enabled,
-    required this.workStartMin,
-    required this.workEndMin,
-    required this.closedDays,
+    required this.workHours,
     this.iban = '',
   });
 
   static const defaults = BookingSettingsData(
     enabled: false,
-    workStartMin: 14 * 60, // check-in
-    workEndMin: 11 * 60,   // check-out (a doua zi)
-    closedDays: {},
+    workHours: {
+      1: _kDefaultDayHours, 2: _kDefaultDayHours, 3: _kDefaultDayHours,
+      4: _kDefaultDayHours, 5: _kDefaultDayHours, 6: _kDefaultDayHours,
+      7: _kDefaultDayHours,
+    },
     iban: '',
   );
 
+  /// Orele propuse pentru o sosire în ziua [weekday]; pentru o zi fără
+  /// check-in (sau necunoscută), cele ale primei zile cu check-in.
+  DayHours hoursFor(int? weekday) {
+    final h = workHours[weekday];
+    if (h != null) return h;
+    if (workHours.isEmpty) return _kDefaultDayHours;
+    return workHours[workHours.keys.reduce((a, b) => a < b ? a : b)]!;
+  }
+
   BookingSettingsData copyWith({
     bool? enabled,
-    int? workStartMin,
-    int? workEndMin,
-    Set<int>? closedDays,
+    Map<int, DayHours>? workHours,
     String? iban,
   }) =>
       BookingSettingsData(
-        enabled:      enabled      ?? this.enabled,
-        workStartMin: workStartMin ?? this.workStartMin,
-        workEndMin:   workEndMin   ?? this.workEndMin,
-        closedDays:   closedDays   ?? this.closedDays,
-        iban:         iban         ?? this.iban,
+        enabled:   enabled   ?? this.enabled,
+        workHours: workHours ?? this.workHours,
+        iban:      iban      ?? this.iban,
       );
 }
 
-Future<BookingSettingsData> _loadBookingSettings(
-    SharedPreferences prefs, String boardId) async {
-  final closedStr = prefs.getString(_closedDaysKeyFor(boardId)) ?? '';
-  final closed = closedStr
+// Setările salvate în formatul vechi: aceleași ore în toate zilele, mai puțin
+// cele fără check-in.
+Map<int, DayHours> _legacyWorkHours(SharedPreferences prefs, String boardId) {
+  final closed = (prefs.getString(_closedDaysKeyFor(boardId)) ?? '')
       .split(',')
       .map((s) => int.tryParse(s.trim()))
       .whereType<int>()
       .toSet();
+  final hours = DayHours(
+    prefs.getInt(_workStartKeyFor(boardId)) ?? _kDefaultDayHours.checkInMin,
+    prefs.getInt(_workEndKeyFor(boardId)) ?? _kDefaultDayHours.checkOutMin,
+  );
+  return {
+    for (var d = 1; d <= 7; d++)
+      if (!closed.contains(d)) d: hours,
+  };
+}
+
+Future<BookingSettingsData> _loadBookingSettings(
+    SharedPreferences prefs, String boardId) async {
+  final hoursStr = prefs.getString(_workHoursKeyFor(boardId));
   return BookingSettingsData(
     enabled: prefs.getBool(_bookingEnabledKeyFor(boardId)) ??
         BookingSettingsData.defaults.enabled,
-    workStartMin: prefs.getInt(_workStartKeyFor(boardId)) ??
-        BookingSettingsData.defaults.workStartMin,
-    workEndMin: prefs.getInt(_workEndKeyFor(boardId)) ??
-        BookingSettingsData.defaults.workEndMin,
-    closedDays: closed,
+    workHours: hoursStr != null
+        ? parseWorkHours(hoursStr)
+        : _legacyWorkHours(prefs, boardId),
     iban: prefs.getString(_ibanKeyFor(boardId)) ?? '',
   );
 }
@@ -321,10 +382,125 @@ Future<BookingSettingsData> _loadBookingSettings(
 Future<void> _saveBookingSettings(String boardId, BookingSettingsData s) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setBool(_bookingEnabledKeyFor(boardId), s.enabled);
-  await prefs.setInt(_workStartKeyFor(boardId), s.workStartMin);
-  await prefs.setInt(_workEndKeyFor(boardId), s.workEndMin);
-  await prefs.setString(_closedDaysKeyFor(boardId), s.closedDays.join(','));
+  await prefs.setString(_workHoursKeyFor(boardId), encodeWorkHours(s.workHours));
   await prefs.setString(_ibanKeyFor(boardId), s.iban);
+}
+
+// Graficul orelor: câte un rând pe zi, pe o axă de 24h, cu un marcaj la ora
+// de check-out și unul la ora de check-in ale sejururilor care încep în acea zi.
+class _WorkHoursChart extends StatelessWidget {
+  final Map<int, String> dayLabels;
+  final Map<int, DayHours> workHours;
+  final void Function(int day) onTapDay;
+
+  const _WorkHoursChart({
+    required this.dayLabels,
+    required this.workHours,
+    required this.onTapDay,
+  });
+
+  static const _labelWidth = 30.0;
+  static const _hoursWidth = 104.0;
+  static const _markWidth = 5.0;
+  static final _checkInColor = Colors.green.shade600;
+  static final _checkOutColor = Colors.orange.shade700;
+
+  Widget _mark(double trackWidth, int minutes, Color color) => Positioned(
+        left: (trackWidth - _markWidth) * minutes / (24 * 60),
+        width: _markWidth,
+        top: 0,
+        bottom: 0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      );
+
+  Widget _legend(Color color, String text, TextStyle style) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 8, height: 8, color: color),
+          const SizedBox(width: 3),
+          Text(text, style: style),
+        ],
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final axisStyle = TextStyle(fontSize: 10, color: Colors.grey.shade600);
+
+    return Column(
+      children: [
+        for (final e in dayLabels.entries)
+          InkWell(
+            onTap: () => onTapDay(e.key),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: _labelWidth,
+                    child: Text(e.value,
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(builder: (_, c) {
+                      final h = workHours[e.key];
+                      return Stack(
+                        children: [
+                          Container(
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          if (h != null) ...[
+                            _mark(c.maxWidth, h.checkOutMin, _checkOutColor),
+                            _mark(c.maxWidth, h.checkInMin, _checkInColor),
+                          ],
+                        ],
+                      );
+                    }),
+                  ),
+                  SizedBox(
+                    width: _hoursWidth,
+                    child: Text(
+                      workHours[e.key] == null
+                          ? tr('fără check-in', 'no check-in')
+                          : '${formatMinutesOfDay(workHours[e.key]!.checkInMin)} → '
+                              '${formatMinutesOfDay(workHours[e.key]!.checkOutMin)}',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: workHours[e.key] == null
+                              ? Colors.grey.shade500
+                              : Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        Padding(
+          padding:
+              const EdgeInsets.only(left: _labelWidth, right: _hoursWidth),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('00:00', style: axisStyle),
+              _legend(_checkInColor, 'check-in', axisStyle),
+              _legend(_checkOutColor, 'check-out', axisStyle),
+              Text('24:00', style: axisStyle),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 // Numărul de tabele (categorii de servicii). ID-urile alarmelor includ indexul

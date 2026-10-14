@@ -24,7 +24,12 @@ String _syncSecretKeyFor(String boardId)    => 'sync_secret_$boardId';
 
 // ── Chei pentru setările de rezervări prin SMS (per tabel) ────────────────────
 String _bookingEnabledKeyFor(String boardId)      => 'booking_enabled_$boardId';
-// Ora de check-in / check-out și zilele fără check-in.
+// Orele pe zile de sosire: „1:840-660,5:960-720” (zi:check-in-check-out, în
+// minute). Citit și nativ de BookingSettings.kt — formatul trebuie să rămână
+// identic.
+String _workHoursKeyFor(String boardId)           => 'work_hours_$boardId';
+// Chei vechi (aceleași ore în toate zilele + zile fără check-in) — doar
+// citite, pentru tabelele salvate înainte de orele pe zile.
 String _workStartKeyFor(String boardId)           => 'work_start_$boardId';
 String _workEndKeyFor(String boardId)             => 'work_end_$boardId';
 String _closedDaysKeyFor(String boardId)          => 'closed_days_$boardId';

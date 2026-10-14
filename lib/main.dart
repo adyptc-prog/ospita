@@ -1471,15 +1471,15 @@ class _ManagementPageState extends State<ManagementPage>
     final today = DateTime(now.year, now.month, now.day);
     const horizonDays = 90;
     const maxResults = 200;
-    final checkInMin  = _bookingSettings.workStartMin;
-    final checkOutMin = _bookingSettings.workEndMin;
 
     for (var d = 0; d <= horizonDays && result.length < maxResults; d++) {
-      final checkIn = today.add(Duration(days: d, minutes: checkInMin));
+      final hours =
+          _bookingSettings.workHours[today.add(Duration(days: d)).weekday];
+      if (hours == null) continue;
+      final checkIn = today.add(Duration(days: d, minutes: hours.checkInMin));
       if (checkIn.isBefore(now)) continue;
-      if (_bookingSettings.closedDays.contains(checkIn.weekday)) continue;
-      final checkOut =
-          today.add(Duration(days: d + nights, minutes: checkOutMin));
+      final checkOut = today
+          .add(Duration(days: d + nights, minutes: hours.checkOutMin));
 
       final overlaps = busy.any(
           (b) => b.start.isBefore(checkOut) && b.end.isAfter(checkIn));
@@ -1608,6 +1608,9 @@ class _ManagementPageState extends State<ManagementPage>
                         );
                         if (date == null) return;
                         if (!ctx.mounted) return;
+                        final checkInMin = _bookingSettings
+                            .hoursFor(date.weekday)
+                            .checkInMin;
                         final time = await showTimePicker(
                           context: ctx,
                           initialTime: selectedStart != null
@@ -1615,8 +1618,8 @@ class _ManagementPageState extends State<ManagementPage>
                                   hour: selectedStart!.hour,
                                   minute: selectedStart!.minute)
                               : TimeOfDay(
-                                  hour: _bookingSettings.workStartMin ~/ 60,
-                                  minute: _bookingSettings.workStartMin % 60),
+                                  hour: checkInMin ~/ 60,
+                                  minute: checkInMin % 60),
                         );
                         if (time == null) return;
                         setDs(() => selectedStart = DateTime(
@@ -1640,6 +1643,10 @@ class _ManagementPageState extends State<ManagementPage>
                       );
                       if (date == null) return;
                       if (!ctx.mounted) return;
+                      // Ora de check-out ține de ziua sosirii.
+                      final checkOutMin = _bookingSettings
+                          .hoursFor(selectedStart?.weekday)
+                          .checkOutMin;
                       final time = await showTimePicker(
                         context: ctx,
                         initialTime: selectedExpiry != null
@@ -1647,8 +1654,8 @@ class _ManagementPageState extends State<ManagementPage>
                                 hour: selectedExpiry!.hour,
                                 minute: selectedExpiry!.minute)
                             : TimeOfDay(
-                                hour: _bookingSettings.workEndMin ~/ 60,
-                                minute: _bookingSettings.workEndMin % 60),
+                                hour: checkOutMin ~/ 60,
+                                minute: checkOutMin % 60),
                       );
                       if (time == null) return;
                       setDs(() => selectedExpiry = DateTime(
@@ -2180,18 +2187,20 @@ class _ManagementPageState extends State<ManagementPage>
   // ── Dialog rezervări prin SMS ────────────────────────────────────────────────
   Future<void> _showBookingSettingsDialog() async {
     bool enabled = _bookingSettings.enabled;
-    TimeOfDay workStart = TimeOfDay(
-        hour: _bookingSettings.workStartMin ~/ 60,
-        minute: _bookingSettings.workStartMin % 60);
-    TimeOfDay workEnd = TimeOfDay(
-        hour: _bookingSettings.workEndMin ~/ 60,
-        minute: _bookingSettings.workEndMin % 60);
-    final closedDays = Set<int>.of(_bookingSettings.closedDays);
+    final workHours = Map<int, DayHours>.of(_bookingSettings.workHours);
+    // Orele propuse pentru o zi nou bifată: ultimele setate în acest dialog.
+    DayHours suggested = _bookingSettings.hoursFor(null);
     final ibanCtrl = TextEditingController(text: _bookingSettings.iban);
 
     final dayLabels = {
       1: tr('L', 'Mo'), 2: tr('Ma', 'Tu'), 3: tr('Mi', 'We'), 4: tr('J', 'Th'),
       5: tr('V', 'Fr'), 6: tr('S', 'Sa'), 7: tr('D', 'Su'),
+    };
+    final dayNames = {
+      1: tr('Luni', 'Monday'), 2: tr('Marți', 'Tuesday'),
+      3: tr('Miercuri', 'Wednesday'), 4: tr('Joi', 'Thursday'),
+      5: tr('Vineri', 'Friday'), 6: tr('Sâmbătă', 'Saturday'),
+      7: tr('Duminică', 'Sunday'),
     };
     var blockThreshold = _noShowBlockThreshold;
     var noShowSms = (await SharedPreferences.getInstance())
@@ -2282,80 +2291,63 @@ class _ManagementPageState extends State<ManagementPage>
                     value: noShowSms,
                     onChanged: (v) => setDs(() => noShowSms = v),
                   ),
-                  const SizedBox(height: 8),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Check-in'),
-                          subtitle: Text(workStart.format(context)),
-                          onTap: () async {
-                            final t = await showTimePicker(
-                                context: ctx, initialTime: workStart);
-                            if (t != null) setDs(() => workStart = t);
-                          },
-                        ),
-                      ),
-                      Expanded(
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Check-out'),
-                          subtitle: Text(workEnd.format(context)),
-                          onTap: () async {
-                            final t = await showTimePicker(
-                                context: ctx, initialTime: workEnd);
-                            if (t != null) setDs(() => workEnd = t);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(tr('Zile fără check-in', 'Days without check-in'),
+                  const SizedBox(height: 16),
+                  Text(tr('Zile cu check-in', 'Days with check-in'),
                       style: TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
                     children: dayLabels.entries.map((e) {
-                      final selected = closedDays.contains(e.key);
                       return FilterChip(
                         label: Text(e.value),
-                        selected: selected,
-                        selectedColor: Colors.red.shade100,
-                        checkmarkColor: Colors.red.shade700,
-                        onSelected: (sel) => setDs(() {
-                          if (sel) {
-                            closedDays.add(e.key);
-                          } else {
-                            closedDays.remove(e.key);
+                        selected: workHours.containsKey(e.key),
+                        selectedColor: Colors.green.shade100,
+                        checkmarkColor: Colors.green.shade700,
+                        onSelected: (sel) async {
+                          if (!sel) {
+                            setDs(() => workHours.remove(e.key));
+                            return;
                           }
-                        }),
+                          final h = await _askDayHours(
+                              ctx, dayNames[e.key]!, suggested);
+                          if (h == null) return;
+                          setDs(() {
+                            workHours[e.key] = h;
+                            suggested = h;
+                          });
+                        },
                       );
                     }).toList(),
                   ),
+                  const SizedBox(height: 10),
+                  _WorkHoursChart(
+                    dayLabels: dayLabels,
+                    workHours: workHours,
+                    onTapDay: (day) async {
+                      final h = await _askDayHours(
+                          ctx, dayNames[day]!, workHours[day] ?? suggested);
+                      if (h == null) return;
+                      setDs(() {
+                        workHours[day] = h;
+                        suggested = h;
+                      });
+                    },
+                  ),
                   const SizedBox(height: 6),
-                  Builder(builder: (_) {
-                    final open = dayLabels.entries
-                        .where((e) => !closedDays.contains(e.key))
-                        .map((e) => e.value)
-                        .toList();
-                    return Text(
-                      open.isEmpty
-                          ? tr('⚠️  Toate zilele sunt bifate — nu se poate face '
-                              'nicio rezervare.',
-                          '⚠️  All days are ticked — no booking '
-                          'can be made.')
-                          : tr('Check-in posibil: ${open.join(', ')}', 'Check-in possible: ${open.join(', ')}'),
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: open.isEmpty
-                              ? Colors.orange.shade700
-                              : Colors.grey.shade700),
-                    );
-                  }),
+                  Text(
+                    workHours.isEmpty
+                        ? tr('⚠️  Nicio zi bifată — nu se poate face nicio '
+                            'rezervare.',
+                        '⚠️  No day is ticked — no booking '
+                        'can be made.')
+                        : tr('Atinge o zi din grafic pentru a-i schimba orele.', 'Tap a day in the chart to change its hours.'),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: workHours.isEmpty
+                            ? Colors.orange.shade700
+                            : Colors.grey.shade700),
+                  ),
                   ...[
                     const SizedBox(height: 14),
                     TextField(
@@ -2387,16 +2379,9 @@ class _ManagementPageState extends State<ManagementPage>
 
     if (saved != true) return;
 
-    final startMin = workStart.hour * 60 + workStart.minute;
-    final endMin = workEnd.hour * 60 + workEnd.minute;
-    // Check-out-ul e de obicei dimineața, mai devreme decât ora de check-in
-    // (ex. check-in 14:00, check-out 11:00 a doua zi) — fără validarea de
-    // ordine de la un program de lucru.
     final updated = _bookingSettings.copyWith(
       enabled: enabled,
-      workStartMin: startMin,
-      workEndMin: endMin,
-      closedDays: closedDays,
+      workHours: workHours,
       iban: ibanCtrl.text.trim(),
     );
     setState(() {
@@ -2408,6 +2393,82 @@ class _ManagementPageState extends State<ManagementPage>
     await prefs.setInt(kNoShowThresholdKey, blockThreshold);
     await prefs.setBool(kNoShowSmsKey, noShowSms);
     await _recomputeFreeSlots();
+  }
+
+  // Orele sejururilor care încep în ziua [dayName]; null dacă s-a renunțat.
+  // Check-out-ul e de obicei dimineața, mai devreme decât ora de check-in
+  // (ex. check-in 14:00, check-out 11:00 în ziua plecării) — fără validare
+  // de ordine.
+  Future<DayHours?> _askDayHours(
+      BuildContext ctx, String dayName, DayHours initial) {
+    var checkIn = TimeOfDay(
+        hour: initial.checkInMin ~/ 60, minute: initial.checkInMin % 60);
+    var checkOut = TimeOfDay(
+        hour: initial.checkOutMin ~/ 60, minute: initial.checkOutMin % 60);
+    return showDialog<DayHours>(
+      context: ctx,
+      builder: (dctx) => StatefulBuilder(
+        builder: (dctx, setDs) {
+          final checkInMin = checkIn.hour * 60 + checkIn.minute;
+          final checkOutMin = checkOut.hour * 60 + checkOut.minute;
+          return AlertDialog(
+            title: Text(tr('Sosiri · $dayName', 'Arrivals · $dayName')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Check-in'),
+                        subtitle: Text(formatMinutesOfDay(checkInMin)),
+                        onTap: () async {
+                          final t = await showTimePicker(
+                              context: dctx, initialTime: checkIn);
+                          if (t != null) setDs(() => checkIn = t);
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Check-out'),
+                        subtitle: Text(formatMinutesOfDay(checkOutMin)),
+                        onTap: () async {
+                          final t = await showTimePicker(
+                              context: dctx, initialTime: checkOut);
+                          if (t != null) setDs(() => checkOut = t);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  tr('Ora de check-out se aplică în ziua plecării, pentru '
+                      'sejururile care încep în această zi.',
+                  'The check-out time applies on the departure day, for '
+                  'stays that start on this day.'),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dctx),
+                child: Text(tr('Anulează', 'Cancel')),
+              ),
+              FilledButton(
+                onPressed: () =>
+                    Navigator.pop(dctx, DayHours(checkInMin, checkOutMin)),
+                child: Text(tr('Salvează', 'Save')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   // ── Dialog sincronizare dispozitiv ───────────────────────────────────────────

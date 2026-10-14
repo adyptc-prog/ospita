@@ -23,7 +23,7 @@ connection.
 
 - **Bookings per room** in up to 10 tables, each booking with check-in, check-out, the guest's
   name and up to 3 phone numbers
-- **Check-in and check-out hours**, and days with no arrivals
+- **Check-in and check-out hours per day of the week**, and days with no arrivals
 - **Free-gap view**, which shows free ranges of at least N nights in the table
 - **SMS self-booking:** the guest sends `liber` or `free` (optionally followed by the room's table name),
   replies with the number of nights, then with the number of a date range. `NEXT` shows more dates.
