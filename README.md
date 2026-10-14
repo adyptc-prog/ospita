@@ -25,11 +25,11 @@ connection.
   name and up to 3 phone numbers
 - **Check-in and check-out hours**, and days with no arrivals
 - **Free-gap view**, which shows free ranges of at least N nights in the table
-- **SMS self-booking:** the guest sends `liber` (optionally followed by the room's table name),
+- **SMS self-booking:** the guest sends `liber` or `free` (optionally followed by the room's table name),
   replies with the number of nights, then with the number of a date range. `NEXT` shows more dates.
 - **24-hour payment deadline:** the bot sends your IBAN. When you mark the booking as paid, the
   guest gets an SMS confirmation. An unpaid SMS booking is cancelled automatically after 24 hours.
-- **Cancellation by SMS**: the guest sends `anuleaza`. This works for SMS bookings and for
+- **Cancellation by SMS**: the guest sends `anuleaza` or `cancel`. This works for SMS bookings and for
   bookings added by hand.
 - **Alerts and SMS reminders** before each arrival, even with the app closed
 - **No-show tracking:** after check-out you confirm whether the guest came. No-shows show up as
@@ -39,6 +39,7 @@ connection.
   active bookings per number
 - **Two-phone sync over SMS**, with messages signed by a pairing code entered on both phones
 - **Encrypted backup**, daily and manual, to phone storage or a USB stick
+- **Romanian and English**, chosen from the globe icon in the app bar (on first launch: Romanian on a Romanian phone, English otherwise)
 - 30-day free trial, then an activation license (see [Free Trial & Activation License](#free-trial--activation-license))
 
 ---
@@ -54,6 +55,8 @@ You mark it paid in the app   →  guest gets an SMS confirmation
 
 The SMS bot runs natively on Android (a `BroadcastReceiver`), so it answers even when the
 app is closed.
+The bot understands the Romanian and the English keywords alike (`liber` / `free`,
+`anuleaza` / `cancel`). It replies in the language set in the app on the phone that receives the SMS.
 
 ---
 
