@@ -9,14 +9,17 @@
 //   ... --out C:\cale\pensiune_license.json   (implicit: pensiune_license.json aici)
 //
 // Codul de instalare îl vede clientul în aplicație, pe ecranul Licență.
-// Cheia privată: tools/private.pem (nu se pune niciodată în git).
+// Cheia privată: D:\PensiuneLicenseTool\private.pem, sau calea din variabila
+// PENSIUNE_PRIVATE_KEY (nu se pune niciodată în git).
+// Alternativ: D:\PensiuneLicenseTool\generate_license_v2.ps1 (aceeași comandă
+// ca la Organizator / InventarPlus).
 
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const PRIVATE_KEY = path.join(__dirname, 'private.pem');
+const PRIVATE_KEY = process.env.PENSIUNE_PRIVATE_KEY || 'D:\\PensiuneLicenseTool\\private.pem';
 const LICENSE_STORE = path.join(ROOT,
   'android/app/src/main/kotlin/com/example/management_app/LicenseStore.kt');
 
