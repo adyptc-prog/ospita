@@ -10,7 +10,7 @@ import org.json.JSONObject
 
 /**
  * Ascultă SMS-urile primite și stochează în coadă pe cele cu prefix PEN:
- * (mesaje de sincronizare trimise de celălalt dispozitiv Rezervări Pensiune).
+ * (mesaje de sincronizare trimise de celălalt dispozitiv Ospita).
  * Fiecare tabel poate avea propriul partener de sincronizare, deci fiecare
  * mesaj e etichetat cu tabelul al cărui partener configurat corespunde
  * expeditorului. Mesajele trebuie să fie semnate cu codul de împerechere al

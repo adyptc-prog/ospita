@@ -42,7 +42,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Rezervări Pensiune'), findsOneWidget);
+    expect(find.text('Ospita'), findsOneWidget);
     expect(find.text('Nr.'), findsOneWidget);
     expect(find.text('Nume'), findsOneWidget);
     expect(find.text('Descriere'), findsOneWidget);
@@ -199,7 +199,7 @@ void main() {
   group('versiunea aplicației', () {
     setUp(() {
       PackageInfo.setMockInitialValues(
-        appName: 'Rezervări Pensiune',
+        appName: 'Ospita',
         packageName: 'app.sayitapp.pensiune',
         version: '1.0.0',
         buildNumber: '1',

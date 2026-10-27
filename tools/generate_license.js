@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Generator manual de licențe Rezervări Pensiune — același format și aceeași
+// Generator manual de licențe Ospita — același format și aceeași
 // semnătură ca licențele emise automat de site (voltacademy_web/lib/licenseSigner.js).
 //
 // Utilizare (din folderul pensiune_app):
@@ -12,7 +12,7 @@
 // Cheia privată: D:\PensiuneLicenseTool\private.pem, sau calea din variabila
 // PENSIUNE_PRIVATE_KEY (nu se pune niciodată în git).
 // Alternativ: D:\PensiuneLicenseTool\generate_license_v2.ps1 (aceeași comandă
-// ca la Organizator / InventarPlus).
+// ca la Appunta / Tally).
 
 const crypto = require('crypto');
 const fs = require('fs');

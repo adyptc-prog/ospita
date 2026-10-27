@@ -1,4 +1,4 @@
-# Rezervări Pensiune
+# Ospita
 
 **Room bookings for small guesthouses, with guests booking and cancelling by SMS.**
 No server. No internet. No accounts.
@@ -9,9 +9,9 @@ No server. No internet. No accounts.
 
 ---
 
-## What is Rezervări Pensiune?
+## What is Ospita?
 
-Rezervări Pensiune is an open-source Flutter app for Android that keeps the bookings of a
+Ospita is an open-source Flutter app for Android that keeps the bookings of a
 guesthouse on the phone, one table per room. It also runs an SMS booking bot. A guest texts
 `liber`, says how many nights, picks one of the free date ranges and gets the payment details.
 The booking appears in the app. Everything runs on the phone, with no server and no internet
@@ -67,15 +67,15 @@ The complete source code, including the 30-day trial check, is published here un
 don't depend on buying anything.
 
 What is sold is an **activation license**: a signed file, tied to one install code (Business ID),
-that unlocks the app after the 30-day free trial in the Rezervări Pensiune app distributed by Volt
-Academy (the Android APK available at [voltacademy.app/pensiune.html](https://voltacademy.app/pensiune.html)).
+that unlocks the app after the 30-day free trial in the Ospita app distributed by Volt
+Academy (the Android APK available at [voltacademy.app/ospita.html](https://voltacademy.app/ospita.html)).
 
 | Period | Requirement |
 |---|---|
 | First 30 days after install | Free, all features |
 | After the trial | Activation license — 30, 60 or 180 days, or permanent |
 
-Licenses are bought at [voltacademy.app/pensiune.html](https://voltacademy.app/pensiune.html#licentiere),
+Licenses are bought at [voltacademy.app/ospita.html](https://voltacademy.app/ospita.html#licentiere),
 where current prices are listed. Expirable licenses bought for the same install code add up, and the
 license becomes permanent automatically once their total reaches the price of a permanent license.
 
@@ -94,7 +94,7 @@ Questions about licenses: [voltacademy.app/contact.html](https://voltacademy.app
 
 ## Platform Support
 
-Rezervări Pensiune is built for **Android** only. SMS sending and receiving, the booking bot,
+Ospita is built for **Android** only. SMS sending and receiving, the booking bot,
 alarms, backup and license import use Android platform channels (Kotlin, in
 `android/app/src/main/kotlin`).
 
@@ -109,8 +109,8 @@ alarms, backup and license import use Android platform channels (Kotlin, in
 ### Run
 
 ```bash
-git clone https://github.com/adyptc-prog/rezervari-pensiune.git
-cd rezervari-pensiune
+git clone https://github.com/adyptc-prog/ospita.git
+cd ospita
 flutter pub get
 flutter run
 ```
@@ -150,7 +150,7 @@ All contributions must be compatible with the AGPL-3.0 license.
 
 ## License
 
-**Rezervări Pensiune — Guesthouse Booking App**<br>
+**Ospita — Guesthouse Booking App**<br>
 Copyright (C) 2026 Adrian Petcu — Volt Academy
 
 This program is free software: you can redistribute it and/or modify

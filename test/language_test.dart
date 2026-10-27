@@ -61,7 +61,7 @@ void main() {
       await tester.pumpWidget(const ManagementApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Rezervări Pensiune'), findsOneWidget);
+      expect(find.text('Ospita'), findsOneWidget);
       expect(find.text('No.'), findsOneWidget);
       expect(find.text('Name'), findsOneWidget);
       expect(find.text('Description'), findsOneWidget);

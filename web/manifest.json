@@ -1,6 +1,6 @@
 {
-    "name": "Rezervări Pensiune",
-    "short_name": "Rezervări Pensiune",
+    "name": "Ospita",
+    "short_name": "Ospita",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#3F51B5",

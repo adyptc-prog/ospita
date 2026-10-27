@@ -35,8 +35,8 @@ object LicenseStore {
     const val KEY_SHARE_PARTNER = "license_share_partner"
     const val KEY_SHARE_LICENSE_ID = "license_share_license_id"
 
-    // Cheia publică RSA-2048 a produsului „Rezervări Pensiune” (diferită de
-    // Organizator) — corespunde tools/private.pem.
+    // Cheia publică RSA-2048 a produsului „Ospita” (diferită de
+    // Appunta) — corespunde tools/private.pem.
     const val PUBLIC_KEY_B64 =
         "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw8qB5prlJuqvSUDF2yjI" +
         "ekO9Fqtk1CVZfiuaPbJfBzql/6vKw3QRhdlEVTqNL5oHUTwsz++CsWPzYEUF0V/n" +

@@ -25,7 +25,7 @@ class NotifAlarmReceiver : BroadcastReceiver() {
             val dataStr = prefs.getString("flutter.notif_alarm_$alarmId", null) ?: return
 
             val json  = JSONObject(dataStr)
-            val title = json.optString("title", "Rezervări Pensiune")
+            val title = json.optString("title", "Ospita")
             val body  = json.optString("body", "")
 
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

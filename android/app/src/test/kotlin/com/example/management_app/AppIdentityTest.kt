@@ -8,12 +8,12 @@ import java.security.interfaces.RSAPublicKey
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
-/** „Rezervări Pensiune” e un produs separat de Organizator. */
+/** „Ospita” e un produs separat de Appunta. */
 class AppIdentityTest {
 
     @Test
-    fun `licenta are cheia proprie, nu pe cea a Organizatorului`() {
-        // Fragment din cheia publică a Organizatorului.
+    fun `licenta are cheia proprie, nu pe cea a aplicației Appunta`() {
+        // Fragment din cheia publică a aplicației Appunta.
         assertFalse(LicenseStore.PUBLIC_KEY_B64.contains("6LMDi/tUuBHqLag6NHTw"))
         val key = KeyFactory.getInstance("RSA").generatePublic(
             X509EncodedKeySpec(Base64.getDecoder().decode(LicenseStore.PUBLIC_KEY_B64))
@@ -22,7 +22,7 @@ class AppIdentityTest {
     }
 
     @Test
-    fun `backup-urile si sincronizarea nu se confunda cu Organizator`() {
+    fun `backup-urile si sincronizarea nu se confunda cu Appunta`() {
         assertEquals("pensiune", BackupFormat.APP_ID)
         assertEquals(".penbackup", BackupFormat.EXTENSION)
         assertEquals("PEN:", SmsSyncReceiver.SYNC_PREFIX)

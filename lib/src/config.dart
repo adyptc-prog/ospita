@@ -109,7 +109,7 @@ bool needsAttendance(Item item, DateTime? since, {DateTime? now}) =>
     item.expiresAt!.isAfter(since);
 
 // Datele demonstrative create la prima instalare de versiunile vechi
-// (moștenite din Organizator) — recunoscute după nume + data creării.
+// (moștenite din Appunta) — recunoscute după nume + data creării.
 const _kDemoItems = {
   'Proiect Alpha': (2026, 1, 10, 9, 0),
   'Raport lunar': (2026, 2, 1, 8, 30),

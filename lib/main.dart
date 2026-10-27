@@ -53,7 +53,7 @@ class ManagementApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      title: 'Rezervări Pensiune',
+      title: 'Ospita',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -122,7 +122,7 @@ class _ManagementPageState extends State<ManagementPage>
   // (Scaffold-ul cu spinner se construiește imediat) — nu explodăm în acel caz.
   Board get _activeBoard => _boards.firstWhere(
       (b) => b.id == _activeBoardId,
-      orElse: () => const Board(id: '', name: 'Rezervări Pensiune'));
+      orElse: () => const Board(id: '', name: 'Ospita'));
   int get _activeBoardIndex => _boards.indexWhere((b) => b.id == _activeBoardId);
 
   @override
@@ -1116,7 +1116,7 @@ class _ManagementPageState extends State<ManagementPage>
               ),
               const SizedBox(height: 12),
               Text(
-                tr('Cumpără o licență pe voltacademy.app/pensiune.html folosind codul de instalare de mai jos, apoi importă fișierul descărcat:', 'Buy a license at voltacademy.app/pensiune.html using the installation code below, then import the downloaded file:'),
+                tr('Cumpără o licență pe voltacademy.app/ospita.html folosind codul de instalare de mai jos, apoi importă fișierul descărcat:', 'Buy a license at voltacademy.app/ospita.html using the installation code below, then import the downloaded file:'),
                 style: TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 8),
@@ -3114,7 +3114,7 @@ class _ManagementPageState extends State<ManagementPage>
             children: [
               // Numele aplicației e lung — pe ecrane înguste se scurtează cu „…”
               // în loc să iasă din bara de sus.
-              const Text('Rezervări Pensiune',
+              const Text('Ospita',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: Colors.white70)),
@@ -3825,7 +3825,7 @@ class _ManagementPageState extends State<ManagementPage>
         List<ReportEntry> all, String period, int actCnt, int delCnt) {
       final buf = StringBuffer();
       buf.writeln('═══════════════════════════════════════');
-      buf.writeln(tr('         RAPORT REZERVĂRI PENSIUNE', '         REZERVĂRI PENSIUNE REPORT'));
+      buf.writeln(tr('         RAPORT OSPITA', '         OSPITA REPORT'));
       buf.writeln('═══════════════════════════════════════');
       buf.writeln(tr('Perioadă : $period', 'Period   : $period'));
       buf.writeln(tr('Total    : ${all.length} înregistrări', 'Total    : ${all.length} ${all.length == 1 ? 'entry' : 'entries'}'));
@@ -4012,7 +4012,7 @@ class _ManagementPageState extends State<ManagementPage>
               final text = buildExportText(
                   all, period, activeItems.length, deletedItems.length);
               SharePlus.instance.share(
-                  ShareParams(text: text, subject: tr('Raport Rezervări Pensiune', 'Rezervări Pensiune report')));
+                  ShareParams(text: text, subject: tr('Raport Ospita', 'Ospita report')));
             },
           ),
           FilledButton(

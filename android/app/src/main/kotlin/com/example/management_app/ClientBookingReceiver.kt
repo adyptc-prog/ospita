@@ -134,7 +134,7 @@ class ClientBookingReceiver : BroadcastReceiver() {
         // Răspunsurile pleacă în limba aleasă în aplicație pe acest telefon.
         AppLang.sync(context)
         // Mesaje de sincronizare — ale acestei aplicații (PEN:) sau ale
-        // aplicației Organizator (ORG:), dacă e pe același telefon.
+        // aplicației Appunta (ORG:), dacă e pe același telefon.
         if (rawBody.startsWith("PEN:") || rawBody.startsWith("ORG:")) {
             Diag.i("handleMessage: ignored, looks like sync message")
             return

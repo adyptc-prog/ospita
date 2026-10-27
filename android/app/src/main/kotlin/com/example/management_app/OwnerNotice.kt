@@ -28,7 +28,7 @@ object OwnerNotice {
         nm.createNotificationChannel(
             NotificationChannel(
                 NotifAlarmReceiver.CHANNEL_ID,
-                tr("Alerte Rezervări Pensiune", "Rezervări Pensiune alerts"),
+                tr("Alerte Ospita", "Ospita alerts"),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply { enableVibration(true) }
         )
