@@ -93,7 +93,8 @@ class ClientBookingReceiverTest {
     }
 
     @Test
-    fun `rezervarea e trimisa imediat partenerului, semnata, si marcata ca trimisa`() {
+    fun `botul nu trimite SMS partenerului, rezervarea ramane de trimis de aplicatie`() {
+        // Play Protect: SMS primit → SMS imediat către alt număr = tipar de troian.
         val partner = "+40799999999"
         context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE).edit()
             .putString("flutter.sync_partner_phone_b1", partner)
@@ -104,9 +105,8 @@ class ClientBookingReceiverTest {
         receiver.handleMessage(context, client, "1")
 
         val entry = JSONArray(SmsSyncReceiver.snapshot(context)).getJSONObject(0)
-        assertTrue(entry.optBoolean("forwarded"))
-        val toPartner = sent.single { it.first == partner }.second
-        assertEquals(entry.getString("msg"), SyncAuth.verify("K7QM2XPA", toPartner))
+        assertFalse(entry.optBoolean("forwarded"))
+        assertTrue(sent.none { it.first == partner })
     }
 
     @Test

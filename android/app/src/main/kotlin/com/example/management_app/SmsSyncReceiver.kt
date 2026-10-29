@@ -72,20 +72,16 @@ class SmsSyncReceiver : BroadcastReceiver() {
 
         /**
          * O schimbare făcută nativ (botul de rezervări, anularea automată la
-         * 24h): trimisă imediat partenerului tabelului, nu abia când se
-         * deschide aplicația — altfel botul de pe celălalt telefon ar putea
-         * oferi aceleași date între timp. Fără partener (sau dacă trimiterea
-         * eșuează) rămâne ca Flutter s-o retrimită la deschidere.
+         * 24h): doar pusă în coadă — Flutter o trimite partenerului la
+         * deschiderea aplicației, ca în Appunta.
+         *
+         * NU o trimitem direct de aici: un SMS primit de la un număr străin
+         * care declanșează imediat un SMS către alt număr fix (cu telefonul
+         * expeditorului în el) e tiparul exact al troienilor care fură SMS-uri,
+         * iar Google Play Protect a blocat versiunea 1.4.1 ca „dăunătoare”.
          */
-        fun enqueueLocal(context: Context, boardId: String, msg: String) {
-            val forwarded = try {
-                sendSigned(context, boardId, msg)
-            } catch (e: Exception) {
-                Diag.e("forward to partner failed", e)
-                false
-            }
-            enqueue(context, boardId, msg, ORIGIN_LOCAL, forwarded)
-        }
+        fun enqueueLocal(context: Context, boardId: String, msg: String) =
+            enqueue(context, boardId, msg, ORIGIN_LOCAL)
 
         /**
          * Coada, ca JSON, pentru Flutter. Intrările vechi (fără id, sau scrise
