@@ -73,9 +73,15 @@ String formatAlertLead(int minutes) {
 
 // Identice cu DEFAULT_TEMPLATE_RO / DEFAULT_TEMPLATE_EN din BotReminders.kt.
 const _kDefaultSmsTemplateRo =
-    'Alertă: [NUME]. Va expira la [DATA_EXPIRARE]. Te rugăm să iei măsurile necesare.';
+    'Bună, [NUME]! Te așteptăm la check-in pe [DATA_CHECKIN]. Pe curând!';
 const _kDefaultSmsTemplateEn =
-    'Reminder: [NAME]. It expires on [EXPIRY_DATE]. Please take the necessary steps.';
+    'Hi [NAME]! We look forward to your check-in on [CHECKIN_DATE]. See you soon!';
+// Mesajele implicite vechi — salvate neschimbate, sunt tratate tot ca
+// implicite, deci primesc automat textul nou.
+const _kLegacySmsTemplates = {
+  'Alertă: [NUME]. Va expira la [DATA_EXPIRARE]. Te rugăm să iei măsurile necesare.',
+  'Reminder: [NAME]. It expires on [EXPIRY_DATE]. Please take the necessary steps.',
+};
 
 // Mesajul implicit urmează limba aplicației. Un mesaj salvat identic cu unul
 // din cele implicite e tratat tot ca implicit; unul editat de utilizator
@@ -87,7 +93,8 @@ String _effectiveSmsTemplate(String? saved) =>
     (saved == null ||
             saved.trim().isEmpty ||
             saved == _kDefaultSmsTemplateRo ||
-            saved == _kDefaultSmsTemplateEn)
+            saved == _kDefaultSmsTemplateEn ||
+            _kLegacySmsTemplates.contains(saved))
         ? _defaultSmsTemplate
         : saved;
 

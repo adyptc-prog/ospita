@@ -964,7 +964,7 @@ class ClientBookingReceiver : BroadcastReceiver() {
 
         enqueueSyncMessage(context, boardId, "PEN:A:$item")
         // Reminderul pleacă și dacă aplicația nu e deschisă până atunci.
-        if (hasWarning) BotReminders.schedule(context, syncId, sender, sender, warning, end)
+        if (hasWarning) BotReminders.schedule(context, syncId, sender, sender, warning, start, end)
         return syncId
     }
 

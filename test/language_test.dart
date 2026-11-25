@@ -122,9 +122,18 @@ void main() {
     }
 
     const ro =
-        'Alertă: [NUME]. Va expira la [DATA_EXPIRARE]. Te rugăm să iei măsurile necesare.';
+        'Bună, [NUME]! Te așteptăm la check-in pe [DATA_CHECKIN]. Pe curând!';
     const en =
-        'Reminder: [NAME]. It expires on [EXPIRY_DATE]. Please take the necessary steps.';
+        'Hi [NAME]! We look forward to your check-in on [CHECKIN_DATE]. See you soon!';
+    const legacyRo =
+        'Alertă: [NUME]. Va expira la [DATA_EXPIRARE]. Te rugăm să iei măsurile necesare.';
+
+    testWidgets('mesajul implicit vechi, salvat neschimbat, primește textul nou',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({'sms_template': legacyRo});
+      await AppLang.load();
+      expect(await templateShown(tester, 'Mesaj SMS'), ro);
+    });
 
     testWidgets('mesajul implicit urmează limba aplicației', (tester) async {
       expect(await templateShown(tester, 'Mesaj SMS'), ro);

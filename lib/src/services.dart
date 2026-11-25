@@ -54,7 +54,9 @@ class NotificationService {
         id: base + item.number * 10 + 1,
         when: item.warningAt!,
         title: tr('⚠️ Alertă: ${item.name}', '⚠️ Alert: ${item.name}'),
-        body: tr('Va expira la ${_fmt(item.expiresAt!)}', 'It expires on ${_fmt(item.expiresAt!)}'),
+        body: item.startsAt != null
+            ? tr('Check-in la ${_fmt(item.startsAt!)}', 'Check-in on ${_fmt(item.startsAt!)}')
+            : tr('Check-out la ${_fmt(item.expiresAt!)}', 'Check-out on ${_fmt(item.expiresAt!)}'),
       );
     }
     if (item.expiresAt != null && item.expiresAt!.isAfter(now)) {
@@ -207,9 +209,12 @@ class SmsService {
 
     final now       = DateTime.now();
     final expiryStr = item.expiresAt != null ? _fmt(item.expiresAt!) : tr('nesetată', 'not set');
+    final checkInStr = item.startsAt != null ? _fmt(item.startsAt!) : expiryStr;
     String buildMsg(String tmpl) => tmpl
         .replaceAll('[NUME]', item.name)
         .replaceAll('[NAME]', item.name)
+        .replaceAll('[DATA_CHECKIN]', checkInStr)
+        .replaceAll('[CHECKIN_DATE]', checkInStr)
         .replaceAll('[DATA_EXPIRARE]', expiryStr)
         .replaceAll('[EXPIRY_DATE]', expiryStr);
 
@@ -221,14 +226,9 @@ class SmsService {
             message: buildMsg(tpl));
       }
     }
-    if (!item.viaBot && item.expiresAt != null && item.expiresAt!.isAfter(now)) {
-      final ids = _expIds(item.number, boardIndex);
-      for (var i = 0; i < phones.length && i < ids.length; i++) {
-        await _schedule(
-            id: ids[i], when: item.expiresAt!, phone: phones[i],
-            message: tr('EXPIRAT: ${buildMsg(tpl)}', 'EXPIRED: ${buildMsg(tpl)}'));
-      }
-    }
+    // Fără SMS „EXPIRAT” la check-out: telefoanele sunt ale oaspeților, care
+    // primesc doar reminderul dinainte (id-urile _expIds rămân doar ca să fie
+    // anulate alarmele vechi).
   }
 
   static Future<void> cancelFor(int number, {required int boardIndex}) async {

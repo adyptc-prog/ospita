@@ -17,6 +17,7 @@ import 'l10n.dart';
 import 'license_screen.dart';
 import 'license_service.dart';
 import 'no_show.dart';
+import 'phone_check.dart';
 
 part 'src/config.dart';
 part 'src/services.dart';
@@ -923,8 +924,8 @@ class _ManagementPageState extends State<ManagementPage>
           final syncId = msg.substring(6).trim();
           final idx = items.indexWhere((e) => e.syncId == syncId);
           if (idx != -1) {
-            deletedBuffer.add(
-                DeletedItem(item: items[idx], deletedAt: DateTime.now()));
+            deletedBuffer.add(DeletedItem(
+                item: items[idx], deletedAt: queuedDeletionTime(items[idx])));
             removed.add(items.removeAt(idx));
             changed = true;
           }
@@ -1330,7 +1331,7 @@ class _ManagementPageState extends State<ManagementPage>
               );
 
           return AlertDialog(
-            title: Text(tr('Spatiere', 'Gaps')),
+            title: Text(tr('Spațiere', 'Gaps')),
             content: SizedBox(
               width: 360,
               child: SingleChildScrollView(
@@ -1557,6 +1558,43 @@ class _ManagementPageState extends State<ManagementPage>
         newAnchor, oldAnchor.difference(oldWarning).inMinutes);
   }
 
+  /// Rezervările din tabel care se suprapun cu sejurul [start, end).
+  List<Item> _overlappingStays(DateTime start, DateTime end,
+      {int? excludeNumber}) {
+    return _items.where((e) {
+      if (e.number == excludeNumber) return false;
+      final s = e.startsAt, x = e.expiresAt;
+      if (s == null || x == null) return false;
+      return start.isBefore(x) && s.isBefore(end);
+    }).toList();
+  }
+
+  Future<bool> _confirmOverlap(BuildContext ctx, List<Item> overlaps) async {
+    final names = overlaps
+        .map((e) => '${e.name} (${_formatDateTime(e.startsAt!)} – '
+            '${_formatDateTime(e.expiresAt!)})')
+        .join(', ');
+    final ok = await showDialog<bool>(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        title: Text(tr('Perioadă ocupată', 'Dates already booked')),
+        content: Text(tr('Sejurul se suprapune cu: $names.',
+            'The stay overlaps with: $names.')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: Text(tr('Înapoi', 'Back')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: Text(tr('Salvează oricum', 'Save anyway')),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   Future<void> _showItemDialog({Item? existing}) async {
     final isEdit  = existing != null;
     // Verificare limită versiune gratuită (doar la adăugare, nu la editare)
@@ -1568,6 +1606,8 @@ class _ManagementPageState extends State<ManagementPage>
     final descCtrl = TextEditingController(text: existing?.description ?? '');
     DateTime? selectedExpiry = existing?.expiresAt;
     DateTime? selectedStart  = existing?.startsAt;
+    String? nameError;
+    String? dateError;
 
     final saved = await showDialog<bool>(
       context: context,
@@ -1583,7 +1623,9 @@ class _ManagementPageState extends State<ManagementPage>
                   TextField(
                     controller: nameCtrl,
                     decoration: InputDecoration(
-                        labelText: tr('Nume *', 'Name *'), border: OutlineInputBorder()),
+                        labelText: tr('Nume *', 'Name *'),
+                        errorText: nameError,
+                        border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -1636,10 +1678,23 @@ class _ManagementPageState extends State<ManagementPage>
                     hasValue: selectedExpiry != null,
                     onClear: () => setDs(() => selectedExpiry = null),
                     onPick: () async {
+                      // Check-out-ul nu poate fi înaintea check-in-ului:
+                      // calendarul începe din ziua sosirii.
+                      final arrival = selectedStart == null
+                          ? null
+                          : DateTime(selectedStart!.year,
+                              selectedStart!.month, selectedStart!.day);
+                      var initial = selectedExpiry ??
+                          arrival?.add(const Duration(days: 1)) ??
+                          DateTime.now();
+                      if (arrival != null && initial.isBefore(arrival)) {
+                        initial = arrival.add(const Duration(days: 1));
+                      }
                       final date = await showDatePicker(
                         context: ctx,
-                        initialDate: selectedExpiry ?? DateTime.now(),
-                        firstDate: DateTime(2020), lastDate: DateTime(2100),
+                        initialDate: initial,
+                        firstDate: arrival ?? DateTime(2020),
+                        lastDate: DateTime(2100),
                       );
                       if (date == null) return;
                       if (!ctx.mounted) return;
@@ -1663,6 +1718,14 @@ class _ManagementPageState extends State<ManagementPage>
                           time.hour, time.minute));
                     },
                   ),
+                  if (dateError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(dateError!,
+                          style: TextStyle(
+                              color: Theme.of(ctx).colorScheme.error,
+                              fontSize: 12)),
+                    ),
                 ],
               ),
             ),
@@ -1673,10 +1736,33 @@ class _ManagementPageState extends State<ManagementPage>
               child: Text(tr('Anulează', 'Cancel')),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 final name = nameCtrl.text.trim();
                 final desc = descCtrl.text.trim();
-                if (name.isEmpty) return;
+                setDs(() {
+                  nameError = name.isEmpty
+                      ? tr('Introdu numele.', 'Enter the name.')
+                      : null;
+                  dateError = selectedStart != null &&
+                          selectedExpiry != null &&
+                          !selectedExpiry!.isAfter(selectedStart!)
+                      ? tr('Check-out-ul trebuie să fie după check-in.',
+                          'Check-out must be after check-in.')
+                      : null;
+                });
+                if (nameError != null || dateError != null) return;
+                if (selectedStart != null &&
+                    selectedExpiry != null &&
+                    (selectedStart != existing?.startsAt ||
+                        selectedExpiry != existing?.expiresAt)) {
+                  final overlaps = _overlappingStays(
+                      selectedStart!, selectedExpiry!,
+                      excludeNumber: existing?.number);
+                  if (overlaps.isNotEmpty) {
+                    final ok = await _confirmOverlap(ctx, overlaps);
+                    if (!ok || !ctx.mounted) return;
+                  }
+                }
                 setState(() {
                   if (isEdit) {
                     final idx =
@@ -1806,7 +1892,7 @@ class _ManagementPageState extends State<ManagementPage>
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        tr('Expiră la: ${_formatDateTime(item.expiresAt!)}', 'Expires at: ${_formatDateTime(item.expiresAt!)}'),
+                        tr('Check-out: ${_formatDateTime(item.expiresAt!)}', 'Check-out: ${_formatDateTime(item.expiresAt!)}'),
                         style: TextStyle(
                             fontSize: 12, color: Colors.grey.shade600),
                       ),
@@ -2012,10 +2098,18 @@ class _ManagementPageState extends State<ManagementPage>
             FilledButton(
               onPressed: () {
                 if (mode == _AlertMode.lead && leadMin <= 0) return;
+                // Un număr invalid nu se salvează: SMS-ul ar eșua (câmpul
+                // își arată singur eroarea).
+                final phones = [phone1Ctrl, phone2Ctrl, phone3Ctrl];
+                if (phones.any((c) =>
+                    c.text.trim().isNotEmpty && !isPlausiblePhone(c.text))) {
+                  setDs(() {});
+                  return;
+                }
                 final warning = effectiveWarning();
-                final p1  = phone1Ctrl.text.trim();
-                final p2  = phone2Ctrl.text.trim();
-                final p3  = phone3Ctrl.text.trim();
+                final p1  = normalizePhoneInput(phone1Ctrl.text);
+                final p2  = normalizePhoneInput(phone2Ctrl.text);
+                final p3  = normalizePhoneInput(phone3Ctrl.text);
                 final idx = _items.indexWhere((e) => e.number == item.number);
                 if (idx != -1) {
                   setState(() {
@@ -2182,6 +2276,20 @@ class _ManagementPageState extends State<ManagementPage>
       await SmsService.sendNow(updated.phoneNumber!,
           tr('Rezervarea ta la ${_activeBoard.name} a fost validată. Te așteptăm!', 'Your booking at ${_activeBoard.name} has been validated. We look forward to seeing you!'));
     }
+    if (!mounted) return;
+    final smsSent = newValidated &&
+        updated.phoneNumber != null &&
+        updated.phoneNumber!.isNotEmpty;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(newValidated
+          ? (smsSent
+              ? tr('„${item.name}”: plată confirmată. Clientul a primit SMS de confirmare.',
+                  '“${item.name}”: payment confirmed. The client got a confirmation SMS.')
+              : tr('„${item.name}”: plată confirmată. Rezervarea nu se mai anulează automat.',
+                  '“${item.name}”: payment confirmed. The booking will no longer be cancelled automatically.'))
+          : tr('„${item.name}”: validarea a fost anulată.',
+              '“${item.name}”: validation cancelled.')),
+    ));
   }
 
   // ── Dialog rezervări prin SMS ────────────────────────────────────────────────
@@ -2477,6 +2585,7 @@ class _ManagementPageState extends State<ManagementPage>
         TextEditingController(text: SyncService.partnerPhone ?? '');
     final codeCtrl = TextEditingController();
     String? codeError;
+    String? phoneError;
 
     await showDialog<void>(
       context: context,
@@ -2545,6 +2654,7 @@ class _ManagementPageState extends State<ManagementPage>
                       decoration: InputDecoration(
                         labelText: tr('Număr telefon partener *', 'Partner phone number *'),
                         hintText: '+40712345678',
+                        errorText: phoneError,
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.phone_outlined),
                       ),
@@ -2625,8 +2735,14 @@ class _ManagementPageState extends State<ManagementPage>
                 icon: const Icon(Icons.sync, size: 18),
                 label: Text(tr('Sincronizează', 'Sync')),
                 onPressed: () async {
-                  final phone = phoneCtrl.text.trim();
-                  if (phone.isEmpty) return;
+                  final phone = normalizePhoneInput(phoneCtrl.text);
+                  if (!isPlausiblePhone(phone)) {
+                    setDs(() => phoneError = phone.isEmpty
+                        ? tr('Introdu numărul telefonului partener.', 'Enter the partner phone number.')
+                        : tr('Număr de telefon invalid.', 'Invalid phone number.'));
+                    return;
+                  }
+                  setDs(() => phoneError = null);
                   if (!SyncService.isValidCode(codeCtrl.text)) {
                     setDs(() => codeError =
                         tr('Minim ${SyncService.minCodeLength} litere/cifre.', 'At least ${SyncService.minCodeLength} letters/digits.'));
@@ -2899,7 +3015,14 @@ class _ManagementPageState extends State<ManagementPage>
               _detailRow(tr('Creat la', 'Created'), _formatDateTime(item.createdAt)),
               const SizedBox(height: 10),
               _detailRow(
-                tr('Expiră la', 'Expires at'),
+                tr('Check-in', 'Check-in'),
+                item.startsAt != null
+                    ? _formatDateTime(item.startsAt!)
+                    : tr('Nesetat', 'Not set'),
+              ),
+              const SizedBox(height: 10),
+              _detailRow(
+                tr('Check-out', 'Check-out'),
                 item.expiresAt != null
                     ? _formatDateTime(item.expiresAt!)
                     : tr('Nesetată', 'Not set'),
@@ -3429,7 +3552,7 @@ class _ManagementPageState extends State<ManagementPage>
                                           _buildHeaderCell(tr('Nume', 'Name'),      SortColumn.name,        width: 160),
                                           _buildHeaderCell(tr('Descriere', 'Description'), SortColumn.description, width: 200),
                                           _buildHeaderCell(tr('Creat la', 'Created'),  SortColumn.createdAt,   width: 155),
-                                          _buildHeaderCell(tr('Expiră la', 'Expires at'), SortColumn.expiresAt,   width: 155),
+                                          _buildHeaderCell(tr('Check-out', 'Check-out'), SortColumn.expiresAt,   width: 155),
                                           SizedBox(width: _actionColWidth),
                                         ],
                                       ),
@@ -3666,7 +3789,7 @@ class _ManagementPageState extends State<ManagementPage>
               const SizedBox(width: 10),
               _bottomBtn(
                 icon: Icons.unfold_more_rounded,
-                label: tr('Spatiere', 'Gaps'),
+                label: tr('Spațiere', 'Gaps'),
                 onTap: _toggleSpatiere,
                 primary: _spatiereActiva,
               ),
@@ -3739,7 +3862,7 @@ class _ManagementPageState extends State<ManagementPage>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(tr('Selectează perioada de expirare:', 'Select the expiry period:'),
+                  Text(tr('Selectează perioada (după check-out):', 'Select the period (by check-out):'),
                       style: TextStyle(fontSize: 13, color: Colors.grey)),
                   const SizedBox(height: 12),
                   _buildDatePickerRow(
@@ -3836,7 +3959,8 @@ class _ManagementPageState extends State<ManagementPage>
         buf.writeln('');
         final del = e.deletedAt != null ? tr(' [ȘTERS]', ' [DELETED]') : '';
         buf.writeln('• ${e.item.name}$del');
-        buf.writeln(tr('  Expiră  : ${e.item.expiresAt != null ? _formatDateTime(e.item.expiresAt!) : "nesetată"}', '  Expires : ${e.item.expiresAt != null ? _formatDateTime(e.item.expiresAt!) : "not set"}'));
+        buf.writeln(tr('  Check-in : ${e.item.startsAt != null ? _formatDateTime(e.item.startsAt!) : "nesetat"}', '  Check-in : ${e.item.startsAt != null ? _formatDateTime(e.item.startsAt!) : "not set"}'));
+        buf.writeln(tr('  Check-out: ${e.item.expiresAt != null ? _formatDateTime(e.item.expiresAt!) : "nesetat"}', '  Check-out: ${e.item.expiresAt != null ? _formatDateTime(e.item.expiresAt!) : "not set"}'));
         if (e.deletedAt != null) {
           buf.writeln(tr('  Șters la: ${_formatDateTime(e.deletedAt!)}', '  Deleted : ${_formatDateTime(e.deletedAt!)}'));
         }
@@ -3975,8 +4099,8 @@ class _ManagementPageState extends State<ManagementPage>
                                   ),
                                   Text(
                                     item.expiresAt != null
-                                        ? tr('Expiră: ${_formatDateTime(item.expiresAt!)}', 'Expires: ${_formatDateTime(item.expiresAt!)}')
-                                        : tr('Fără dată de expirare', 'No expiry date'),
+                                        ? '${item.startsAt != null ? 'Check-in: ${_formatDateTime(item.startsAt!)} · ' : ''}Check-out: ${_formatDateTime(item.expiresAt!)}'
+                                        : tr('Fără check-out', 'No check-out'),
                                     style: TextStyle(
                                         fontSize: 12,
                                         color: isDeleted
@@ -4007,7 +4131,7 @@ class _ManagementPageState extends State<ManagementPage>
         actions: [
           TextButton.icon(
             icon: const Icon(Icons.share_outlined, size: 18),
-            label: const Text('Share'),
+            label: Text(tr('Trimite', 'Share')),
             onPressed: () {
               final text = buildExportText(
                   all, period, activeItems.length, deletedItems.length);
@@ -4110,7 +4234,8 @@ class _ManagementPageState extends State<ManagementPage>
                 ),
                 const SizedBox(height: 4),
                 _templateChip(tr('[NUME]', '[NAME]'), tr('Numele înregistrării', 'The name of the entry')),
-                _templateChip(tr('[DATA_EXPIRARE]', '[EXPIRY_DATE]'), tr('Data și ora expirării', 'The expiry date and time')),
+                _templateChip(tr('[DATA_CHECKIN]', '[CHECKIN_DATE]'), tr('Data și ora check-in-ului', 'The check-in date and time')),
+                _templateChip(tr('[DATA_EXPIRARE]', '[EXPIRY_DATE]'), tr('Data și ora check-out-ului', 'The check-out date and time')),
                 const SizedBox(height: 12),
                 TextField(
                   controller: ctrl,
@@ -4165,6 +4290,9 @@ class _ManagementPageState extends State<ManagementPage>
       decoration: InputDecoration(
         labelText: label,
         hintText: '+40712345678',
+        errorText: ctrl.text.trim().isNotEmpty && !isPlausiblePhone(ctrl.text)
+            ? tr('Număr de telefon invalid', 'Invalid phone number')
+            : null,
         border: const OutlineInputBorder(),
         prefixIcon: const Icon(Icons.phone_outlined, size: 18),
         isDense: true,
@@ -4202,4 +4330,17 @@ class _ManagementPageState extends State<ManagementPage>
       ),
     );
   }
+}
+
+/// Ora de afișat la „Șters la” pentru o ștergere preluată din coadă. Anularea
+/// automată (plata nevalidată în 24 h) se aplică abia la deschiderea
+/// aplicației — atunci folosim ora reală a termenului, nu ora deschiderii.
+DateTime queuedDeletionTime(Item item, {DateTime? now}) {
+  final current = now ?? DateTime.now();
+  if (item.validated) return current;
+  final deadline = item.createdAt.add(const Duration(hours: 24));
+  final start = item.startsAt;
+  final wasAutoCancelled = deadline.isBefore(current) &&
+      (start == null || deadline.isBefore(start));
+  return wasAutoCancelled ? deadline : current;
 }

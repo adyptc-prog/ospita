@@ -130,7 +130,7 @@ class BotRemindersTest {
     @Test
     fun `mesajul foloseste formatul de data al aplicatiei`() {
         assertEquals("X 0712 05.01.2030 10:30",
-            BotReminders.buildMessage("X [NUME] [DATA_EXPIRARE]", "0712",
-                LocalDateTime.of(2030, 1, 5, 10, 30)))
+            BotReminders.buildMessage("X [NUME] [DATA_CHECKIN]", "0712",
+                LocalDateTime.of(2030, 1, 5, 10, 30), LocalDateTime.of(2030, 1, 7, 11, 0)))
     }
 }

@@ -157,9 +157,9 @@ object BookingSettings {
                     val syncId = o.optString("syncId", "")
                     if (syncId.isEmpty()) continue
                     val phones = listOfNotNull(
-                        o.optString("phoneNumber", "").takeIf { it.isNotEmpty() },
-                        o.optString("phoneNumber2", "").takeIf { it.isNotEmpty() },
-                        o.optString("phoneNumber3", "").takeIf { it.isNotEmpty() },
+                        o.optString("phoneNumber", "").takeIf { it.isNotEmpty() && it != "null" },
+                        o.optString("phoneNumber2", "").takeIf { it.isNotEmpty() && it != "null" },
+                        o.optString("phoneNumber3", "").takeIf { it.isNotEmpty() && it != "null" },
                     )
                     if (phones.isEmpty()) continue
                     val expiresStr = o.optString("expiresAt", "")

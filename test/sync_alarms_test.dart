@@ -138,15 +138,15 @@ void main() {
     // „cccc” devine numărul 2: alarmele lui trebuie să rămână programate
     // sub 2, cu payload-ul salvat.
     expect(lastSmsOp(210), 'schedule');
-    expect(lastSmsOp(220), 'schedule');
+    expect(lastSmsOp(220), isNot('schedule')); // fără SMS „EXPIRAT” la check-out
     final prefs = await SharedPreferences.getInstance();
-    expect(jsonDecode(prefs.getString('sms_alarm_220')!)['phone'], '0733333333');
+    expect(jsonDecode(prefs.getString('sms_alarm_210')!)['phone'], '0733333333');
     // Numărul 3 nu mai există.
     expect(lastSmsOp(320), 'cancel');
     expect(prefs.containsKey('sms_alarm_320'), isFalse);
   });
 
-  testWidgets('rezervarea prin bot nu primește SMS „EXPIRAT”, cea manuală da',
+  testWidgets('nicio rezervare nu mai primește SMS „EXPIRAT” la check-out',
       (tester) async {
     String add(String syncId, {bool bot = false}) => 'PEN:A:${jsonEncode({
           's': syncId,
@@ -164,7 +164,7 @@ void main() {
 
     // Numerele 4 (bot) și 5 (manual): expirare = n*100+20.
     expect(lastSmsOp(420), isNot('schedule'));
-    expect(lastSmsOp(520), 'schedule');
+    expect(lastSmsOp(520), isNot('schedule'));
     final prefs = await SharedPreferences.getInstance();
     final items = jsonDecode(prefs.getString('management_items_b1')!) as List;
     expect(items.firstWhere((i) => i['syncId'] == 'botb')['viaBot'], isTrue);
